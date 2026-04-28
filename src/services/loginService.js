@@ -127,7 +127,8 @@
 
 
 // services/loginService.js
-const API_BASE_URL = "https://banker-backend-8ttk.onrender.com/api/auth";
+const URL = "http://localhost:5000"
+const API_BASE_URL = `${URL}/api/auth`;
 
 export const loginService = async (email, password) => {
   try {
