@@ -2822,7 +2822,8 @@ import { loginService, logoutService } from "./services/loginService";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 
-const URL = "http://localhost:5000"
+// const URL = "http://localhost:5000"
+const URL = "https://banker-backend-8ttk.onrender.com"
 const API_URL = `${URL}/api/case/summary-data`;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -3266,9 +3267,9 @@ function MultiSelect({ options, selectedValues, onChange, placeholder = "Select.
     onChange([]);
   };
 
-  const displayText = selectedValues.length === 0 
-    ? placeholder 
-    : selectedValues.length === options.length 
+  const displayText = selectedValues.length === 0
+    ? placeholder
+    : selectedValues.length === options.length
       ? `All Selected (${selectedValues.length})`
       : `${selectedValues.length} selected`;
 
@@ -3501,7 +3502,7 @@ function LoginPage({ onLogin, error, loading }) {
             type="submit"
             disabled={loading}
             style={{
-              width: "100%", 
+              width: "100%",
               background: loading ? "#94a3b8" : "linear-gradient(135deg, #2563eb, #3b82f6)",
               color: "#fff", border: "none", borderRadius: "10px", padding: "12px 16px",
               fontSize: "15px", fontWeight: "600", cursor: loading ? "not-allowed" : "pointer",
@@ -4058,8 +4059,8 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
   }, [colOrder, isBulk, hiddenCols]);
 
   return (
-   <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", display: "flex", alignItems: "stretch", justifyContent: "stretch", padding: 0, overflow: "hidden" }}>
-  <div style={{ background: "#fff", borderRadius: 0, width: "100vw", height: "100vh", maxWidth: "none", boxShadow: "none", overflow: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", display: "flex", alignItems: "stretch", justifyContent: "stretch", padding: 0, overflow: "hidden" }}>
+      <div style={{ background: "#fff", borderRadius: 0, width: "100vw", height: "100vh", maxWidth: "none", boxShadow: "none", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "linear-gradient(135deg, #1e3a5f, #1a365d)", color: "#fff" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Icon type="invoice" size={20} />
@@ -4433,7 +4434,7 @@ export default function App() {
   const filtered = useMemo(() => {
     return cases.filter(c => {
       if (bankFilter.length > 0 && !bankFilter.includes(c.bankName)) return false;
-      
+
       const q = search.toLowerCase();
       if (q && !c.customerName.toLowerCase().includes(q) && !c.bankName.toLowerCase().includes(q) && !c.refNo.toLowerCase().includes(q)) return false;
 
@@ -4541,20 +4542,20 @@ export default function App() {
       )}
 
       {/* SIDEBAR - Materially Style */}
-      <aside style={{ 
-        position: "fixed", top: 0, left: 0, height: "100%", width: 260, zIndex: 30, 
-        background: "#fff", borderRight: "1px solid #e2e8f0", display: "flex", 
-        flexDirection: "column", transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)", 
+      <aside style={{
+        position: "fixed", top: 0, left: 0, height: "100%", width: 260, zIndex: 30,
+        background: "#fff", borderRight: "1px solid #e2e8f0", display: "flex",
+        flexDirection: "column", transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
         transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
         boxShadow: sidebarOpen ? "4px 0 20px rgba(0,0,0,0.05)" : "none"
       }}>
         {/* Sidebar Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ 
-              width: 40, height: 40, borderRadius: 12, 
-              background: "linear-gradient(135deg, #3b82f6, #2563eb)", 
-              display: "flex", alignItems: "center", justifyContent: "center", 
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+              display: "flex", alignItems: "center", justifyContent: "center",
               color: "#fff", fontWeight: 700, fontSize: 18,
               boxShadow: "0 4px 12px rgba(37,99,235,0.3)"
             }}>U</div>
@@ -4568,7 +4569,7 @@ export default function App() {
         {/* Sidebar Navigation */}
         <nav style={{ flex: 1, padding: "20px 16px" }}>
           <p style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1.5px", padding: "0 12px 12px", margin: 0 }}>Main Menu</p>
-          
+
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {[
               { id: "Dashboard", icon: "grid", label: "Dashboard" },
@@ -4576,7 +4577,7 @@ export default function App() {
             ].map(item => {
               const isActive = activeTab === item.id;
               const isHovered = sidebarHover === item.id;
-              
+
               return (
                 <button
                   key={item.id}
@@ -4592,8 +4593,8 @@ export default function App() {
                     borderRadius: "12px",
                     border: "none",
                     cursor: "pointer",
-                    background: isActive 
-                      ? "linear-gradient(135deg, #3b82f6, #2563eb)" 
+                    background: isActive
+                      ? "linear-gradient(135deg, #3b82f6, #2563eb)"
                       : isHovered ? "#f1f5f9" : "transparent",
                     color: isActive ? "#fff" : "#475569",
                     fontSize: 14,
@@ -4618,15 +4619,15 @@ export default function App() {
                     animation: isActive ? "ripple 0.6s ease-out" : "none",
                     pointerEvents: "none"
                   }} />
-                  
-                  <span style={{ 
+
+                  <span style={{
                     transition: "transform 0.2s ease",
                     transform: isHovered && !isActive ? "scale(1.1)" : "scale(1)"
                   }}>
                     <Icon type={item.icon} size={18} />
                   </span>
                   <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
-                  
+
                   {isActive && (
                     <span style={{
                       width: 6, height: 6, borderRadius: "50%",
@@ -4642,16 +4643,16 @@ export default function App() {
 
         {/* Sidebar Footer */}
         <div style={{ padding: "20px", borderTop: "1px solid #f1f5f9" }}>
-          <div style={{ 
-            display: "flex", alignItems: "center", gap: 12, 
-            padding: "12px", borderRadius: "12px", 
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px", borderRadius: "12px",
             background: "#f8fafc"
           }}>
-            <div style={{ 
-              width: 40, height: 40, borderRadius: "50%", 
-              background: "linear-gradient(135deg, #e0e7ff, #c7d2fe)", 
-              display: "flex", alignItems: "center", justifyContent: "center", 
-              fontSize: 14, fontWeight: 600, color: "#4f46e5" 
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%",
+              background: "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 14, fontWeight: 600, color: "#4f46e5"
             }}>AV</div>
             <div>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Admin User</p>
@@ -4662,18 +4663,18 @@ export default function App() {
       </aside>
 
       {/* HEADER */}
-      <header style={{ 
-        position: "fixed", top: 0, right: 0, left: mainML, height: 68, zIndex: 10, 
-        background: "#fff", borderBottom: "1px solid #e2e8f0", 
-        display: "flex", alignItems: "center", justifyContent: "space-between", 
+      <header style={{
+        position: "fixed", top: 0, right: 0, left: mainML, height: 68, zIndex: 10,
+        background: "#fff", borderBottom: "1px solid #e2e8f0",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 28px", transition: "left 0.3s cubic-bezier(0.4,0,0.2,1)",
         boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            style={{ 
-              background: "none", border: "none", cursor: "pointer", 
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
               color: "#64748b", padding: 8, borderRadius: 8,
               transition: "all 0.2s"
             }}
@@ -4690,11 +4691,11 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button 
-            onClick={handleLogout} 
-            style={{ 
-              background: "#fee2e2", color: "#dc2626", border: "none", 
-              borderRadius: 10, padding: "8px 16px", cursor: "pointer", 
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "#fee2e2", color: "#dc2626", border: "none",
+              borderRadius: 10, padding: "8px 16px", cursor: "pointer",
               fontSize: 13, fontWeight: 600, transition: "all 0.2s",
               letterSpacing: "0.2px"
             }}
@@ -4703,10 +4704,10 @@ export default function App() {
           >
             Logout
           </button>
-          <div style={{ 
-            width: 36, height: 36, borderRadius: "50%", 
-            background: "linear-gradient(135deg, #3b82f6, #2563eb)", 
-            display: "flex", alignItems: "center", justifyContent: "center", 
+          <div style={{
+            width: 36, height: 36, borderRadius: "50%",
+            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+            display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 13, fontWeight: 600,
             boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
           }}>AV</div>
@@ -4714,13 +4715,13 @@ export default function App() {
       </header>
 
       {/* MAIN CONTENT */}
-      <main style={{ 
-        marginLeft: mainML, paddingTop: 68, minHeight: "100vh", 
+      <main style={{
+        marginLeft: mainML, paddingTop: 68, minHeight: "100vh",
         transition: "margin-left 0.3s cubic-bezier(0.4,0,0.2,1)",
         background: "#f1f5f9"
       }}>
         <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
-          
+
           {/* Breadcrumb */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94a3b8" }}>
             <span style={{ color: "#3b82f6", cursor: "pointer", fontWeight: 500 }} onClick={() => setActiveTab("Dashboard")}>Home</span>
@@ -4734,9 +4735,9 @@ export default function App() {
               {/* Stats Cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }}>
                 {statCards.map((s, idx) => (
-                  <div 
-                    key={s.label} 
-                    style={{ 
+                  <div
+                    key={s.label}
+                    style={{
                       background: "#fff", borderRadius: "16px", padding: "24px",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)",
                       border: "1px solid #f1f5f9",
@@ -4744,19 +4745,19 @@ export default function App() {
                       animation: `fadeInUp 0.4s ease ${idx * 0.05}s both`,
                       cursor: "default"
                     }}
-                    onMouseEnter={e => { 
-                      e.currentTarget.style.transform = "translateY(-4px)"; 
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = "translateY(-4px)";
                       e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.08)";
                     }}
-                    onMouseLeave={e => { 
-                      e.currentTarget.style.transform = "translateY(0)"; 
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)";
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                      <div style={{ 
-                        width: 44, height: 44, borderRadius: "12px", 
-                        background: s.bg, display: "flex", alignItems: "center", 
+                      <div style={{
+                        width: 44, height: 44, borderRadius: "12px",
+                        background: s.bg, display: "flex", alignItems: "center",
                         justifyContent: "center"
                       }}>
                         <Icon type={s.icon} size={20} color={s.color} />
@@ -4769,13 +4770,13 @@ export default function App() {
               </div>
 
               {/* Saved Invoices Section */}
-              <div style={{ 
-                background: "#fff", borderRadius: "16px", 
+              <div style={{
+                background: "#fff", borderRadius: "16px",
                 border: "1px solid #f1f5f9", overflow: "hidden",
                 boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
               }}>
-                <div style={{ 
-                  padding: "20px 28px", borderBottom: "1px solid #f1f5f9", 
+                <div style={{
+                  padding: "20px 28px", borderBottom: "1px solid #f1f5f9",
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   flexWrap: "wrap", gap: 16
                 }}>
@@ -4785,10 +4786,10 @@ export default function App() {
                   </div>
                   <button
                     onClick={exportSavedInvoicesToExcel}
-                    style={{ 
-                      display: "flex", alignItems: "center", gap: 8, 
-                      background: "#fff", border: "1px solid #e2e8f0", 
-                      borderRadius: 10, padding: "10px 18px", fontSize: 13, 
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      background: "#fff", border: "1px solid #e2e8f0",
+                      borderRadius: 10, padding: "10px 18px", fontSize: 13,
                       fontWeight: 600, cursor: "pointer", color: "#475569",
                       transition: "all 0.2s"
                     }}
@@ -4798,7 +4799,7 @@ export default function App() {
                     <Icon type="excel" size={16} /> Export Excel
                   </button>
                 </div>
-                
+
                 {/* Dashboard Filters */}
                 <div style={{ padding: "16px 28px", borderBottom: "1px solid #f1f5f9", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
                   <MultiSelect
@@ -4826,9 +4827,9 @@ export default function App() {
                     placeholder="Status: All"
                   />
                   {hasFilters && (
-                    <button onClick={clearFilters} style={{ 
-                      fontSize: 12, color: "#dc2626", background: "#fef2f2", 
-                      border: "1px solid #fecaca", borderRadius: 8, padding: "8px 14px", 
+                    <button onClick={clearFilters} style={{
+                      fontSize: 12, color: "#dc2626", background: "#fef2f2",
+                      border: "1px solid #fecaca", borderRadius: 8, padding: "8px 14px",
                       cursor: "pointer", fontWeight: 600, transition: "all 0.2s"
                     }}>
                       Clear Filters
@@ -4841,9 +4842,9 @@ export default function App() {
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
                         {["Invoice No", "Bank Name", "Bill Month", "Date", "Amount", "Status", "Action"].map(h => (
-                          <th key={h} style={{ 
-                            padding: "14px 20px", textAlign: "left", fontSize: 11, 
-                            fontWeight: 600, color: "#64748b", textTransform: "uppercase", 
+                          <th key={h} style={{
+                            padding: "14px 20px", textAlign: "left", fontSize: 11,
+                            fontWeight: 600, color: "#64748b", textTransform: "uppercase",
                             letterSpacing: "0.5px", borderBottom: "2px solid #e2e8f0"
                           }}>{h}</th>
                         ))}
@@ -4855,12 +4856,12 @@ export default function App() {
                       ) : savedInvoices.length === 0 ? (
                         <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>No saved invoices in database.</td></tr>
                       ) : savedInvoices.map((inv, idx) => (
-                        <tr key={inv._id} style={{ 
+                        <tr key={inv._id} style={{
                           borderBottom: "1px solid #f1f5f9",
                           transition: "background 0.15s"
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                           <td style={{ padding: "14px 20px", fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{inv.invoiceNo}</td>
                           <td style={{ padding: "14px 20px", fontSize: 13, color: "#334155" }}>{inv.bankName}</td>
                           <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569" }}>{inv.billMonth}</td>
@@ -4882,10 +4883,10 @@ export default function App() {
                           <td style={{ padding: "14px 20px" }}>
                             <button
                               onClick={() => setInvoiceModal({ existingInvoice: inv })}
-                              style={{ 
-                                background: "#eff6ff", color: "#1d4ed8", 
-                                border: "1px solid #bfdbfe", borderRadius: 8, 
-                                padding: "8px 16px", fontSize: 12, fontWeight: 600, 
+                              style={{
+                                background: "#eff6ff", color: "#1d4ed8",
+                                border: "1px solid #bfdbfe", borderRadius: 8,
+                                padding: "8px 16px", fontSize: 12, fontWeight: 600,
                                 cursor: "pointer", transition: "all 0.2s"
                               }}
                               onMouseEnter={e => { e.target.style.background = "#dbeafe"; }}
@@ -4905,8 +4906,8 @@ export default function App() {
 
           {/* INVOICE TAB */}
           {activeTab === "Invoice" && (
-            <div style={{ 
-              background: "#fff", borderRadius: "16px", 
+            <div style={{
+              background: "#fff", borderRadius: "16px",
               border: "1px solid #f1f5f9", overflow: "hidden",
               boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
             }}>
@@ -4922,11 +4923,11 @@ export default function App() {
                     {canBulkInvoice && !loading && (
                       <button
                         onClick={() => setInvoiceModal({ cases: filtered, isBulk: true })}
-                        style={{ 
-                          display: "flex", alignItems: "center", gap: 8, 
-                          fontSize: 13, color: "#fff", 
-                          background: "linear-gradient(135deg, #3b82f6, #2563eb)", 
-                          border: "none", borderRadius: 10, padding: "10px 20px", 
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          fontSize: 13, color: "#fff",
+                          background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                          border: "none", borderRadius: 10, padding: "10px 20px",
                           cursor: "pointer", fontWeight: 600,
                           boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
                           transition: "all 0.2s"
@@ -4938,9 +4939,9 @@ export default function App() {
                       </button>
                     )}
                     {hasFilters && (
-                      <button onClick={clearFilters} style={{ 
-                        fontSize: 13, color: "#dc2626", background: "#fef2f2", 
-                        border: "1px solid #fecaca", borderRadius: 10, padding: "10px 18px", 
+                      <button onClick={clearFilters} style={{
+                        fontSize: 13, color: "#dc2626", background: "#fef2f2",
+                        border: "1px solid #fecaca", borderRadius: 10, padding: "10px 18px",
                         cursor: "pointer", fontWeight: 600
                       }}>
                         Clear filters
@@ -4951,25 +4952,25 @@ export default function App() {
 
                 {/* Invoice Page Filters */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 18, alignItems: "center" }}>
-                  <div style={{ 
-                    display: "flex", alignItems: "center", gap: 10, 
-                    background: "#f8fafc", border: "1px solid #e2e8f0", 
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    background: "#f8fafc", border: "1px solid #e2e8f0",
                     borderRadius: 10, padding: "10px 16px", minWidth: 220, flex: "1 1 220px",
                     transition: "all 0.2s"
                   }}>
                     <Icon type="search" size={16} />
-                    <input 
-                      value={search} 
-                      onChange={e => setSearch(e.target.value)} 
-                      placeholder="Search customer name…" 
-                      style={{ 
-                        background: "none", border: "none", outline: "none", 
+                    <input
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Search customer name…"
+                      style={{
+                        background: "none", border: "none", outline: "none",
                         fontSize: 13, color: "#0f172a", width: "100%",
                         fontFamily: "inherit"
-                      }} 
+                      }}
                     />
                   </div>
-                  
+
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Icon type="filter" size={16} />
                     <MultiSelect
@@ -4979,7 +4980,7 @@ export default function App() {
                       placeholder="Bank: All"
                     />
                   </div>
-                  
+
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Icon type="calendar" size={16} />
                     <MultiSelect
@@ -4989,43 +4990,43 @@ export default function App() {
                       placeholder="Month: All"
                     />
                   </div>
-                  
+
                   <MultiSelect
                     options={Array.from({ length: 5 }, (_, i) => 2024 + i).map(y => ({ value: y, label: String(y) }))}
                     selectedValues={yearFilter}
                     onChange={setYearFilter}
                     placeholder="Year: All"
                   />
-                  
+
                   <MultiSelect
                     options={["Pending", "Work in Progress", "FinalSubmitted", "Query Raised", "Cancelled"].map(s => ({ value: s, label: s }))}
                     selectedValues={statusFilter}
                     onChange={setStatusFilter}
                     placeholder="Status: All"
                   />
-                  
+
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Visit date:</span>
-                    <input 
-                      type="date" 
-                      value={fromDate} 
-                      onChange={e => { setFromDate(e.target.value); setPage(1); }} 
-                      style={{ 
-                        fontSize: 12, borderRadius: 8, padding: "9px 12px", 
-                        border: "1px solid #e2e8f0", background: "#fff", 
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={e => { setFromDate(e.target.value); setPage(1); }}
+                      style={{
+                        fontSize: 12, borderRadius: 8, padding: "9px 12px",
+                        border: "1px solid #e2e8f0", background: "#fff",
                         color: "#0f172a", cursor: "pointer", fontFamily: "inherit"
-                      }} 
+                      }}
                     />
                     <span style={{ fontSize: 12, color: "#94a3b8" }}>to</span>
-                    <input 
-                      type="date" 
-                      value={toDate} 
-                      onChange={e => { setToDate(e.target.value); setPage(1); }} 
-                      style={{ 
-                        fontSize: 12, borderRadius: 8, padding: "9px 12px", 
-                        border: "1px solid #e2e8f0", background: "#fff", 
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={e => { setToDate(e.target.value); setPage(1); }}
+                      style={{
+                        fontSize: 12, borderRadius: 8, padding: "9px 12px",
+                        border: "1px solid #e2e8f0", background: "#fff",
                         color: "#0f172a", cursor: "pointer", fontFamily: "inherit"
-                      }} 
+                      }}
                     />
                   </div>
                 </div>
@@ -5046,10 +5047,10 @@ export default function App() {
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
                         {["#", "Bank name", "Customer name", "Ref no.", "Address", "Created Date", "Date of visit", "Status", "Invoice"].map(h => (
-                          <th key={h} style={{ 
-                            padding: "14px 20px", textAlign: "left", fontSize: 11, 
-                            fontWeight: 600, color: "#64748b", textTransform: "uppercase", 
-                            letterSpacing: "0.5px", whiteSpace: "nowrap", 
+                          <th key={h} style={{
+                            padding: "14px 20px", textAlign: "left", fontSize: 11,
+                            fontWeight: 600, color: "#64748b", textTransform: "uppercase",
+                            letterSpacing: "0.5px", whiteSpace: "nowrap",
                             borderBottom: "2px solid #e2e8f0"
                           }}>{h}</th>
                         ))}
@@ -5059,28 +5060,28 @@ export default function App() {
                       {paginated.length === 0 ? (
                         <tr><td colSpan={9} style={{ padding: 50, textAlign: "center", fontSize: 14, color: "#94a3b8" }}>No cases match the current filters.</td></tr>
                       ) : paginated.map((c, i) => (
-                        <tr key={c._id} style={{ 
+                        <tr key={c._id} style={{
                           borderBottom: "1px solid #f1f5f9",
                           transition: "background 0.15s"
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                           <td style={{ padding: "14px 20px", fontSize: 13, color: "#94a3b8" }}>{(page - 1) * PAGE_SIZE + i + 1}</td>
                           <td style={{ padding: "14px 20px", whiteSpace: "nowrap" }}>
-                            <span style={{ 
-                              fontSize: 12, fontWeight: 600, 
-                              background: "#eff6ff", color: "#1d4ed8", 
-                              border: "1px solid #bfdbfe", borderRadius: 8, 
+                            <span style={{
+                              fontSize: 12, fontWeight: 600,
+                              background: "#eff6ff", color: "#1d4ed8",
+                              border: "1px solid #bfdbfe", borderRadius: 8,
                               padding: "5px 12px"
                             }}>{c.bankName}</span>
                           </td>
                           <td style={{ padding: "14px 20px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                              <div style={{ 
-                                width: 36, height: 36, borderRadius: "50%", 
-                                background: "#f1f5f9", display: "flex", 
-                                alignItems: "center", justifyContent: "center", 
-                                fontSize: 12, fontWeight: 600, color: "#64748b", flexShrink: 0 
+                              <div style={{
+                                width: 36, height: 36, borderRadius: "50%",
+                                background: "#f1f5f9", display: "flex",
+                                alignItems: "center", justifyContent: "center",
+                                fontSize: 12, fontWeight: 600, color: "#64748b", flexShrink: 0
                               }}>
                                 {c.customerName !== "—" ? c.customerName.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase() : "—"}
                               </div>
@@ -5098,11 +5099,11 @@ export default function App() {
                             <button
                               onClick={() => setInvoiceModal({ cases: [c], isBulk: false })}
                               title="Open Invoice"
-                              style={{ 
-                                display: "flex", alignItems: "center", gap: 6, 
-                                background: "#eff6ff", color: "#1d4ed8", 
-                                border: "1px solid #bfdbfe", borderRadius: 8, 
-                                padding: "7px 14px", cursor: "pointer", fontSize: 12, 
+                              style={{
+                                display: "flex", alignItems: "center", gap: 6,
+                                background: "#eff6ff", color: "#1d4ed8",
+                                border: "1px solid #bfdbfe", borderRadius: 8,
+                                padding: "7px 14px", cursor: "pointer", fontSize: 12,
                                 fontWeight: 600, whiteSpace: "nowrap",
                                 transition: "all 0.2s"
                               }}
@@ -5121,24 +5122,24 @@ export default function App() {
 
               {/* PAGINATION */}
               {!loading && !error && (
-                <div style={{ 
-                  padding: "16px 28px", borderTop: "1px solid #f1f5f9", 
-                  display: "flex", alignItems: "center", justifyContent: "space-between", 
-                  flexWrap: "wrap", gap: 12 
+                <div style={{
+                  padding: "16px 28px", borderTop: "1px solid #f1f5f9",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  flexWrap: "wrap", gap: 12
                 }}>
                   <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>
                     Page <strong style={{ color: "#0f172a" }}>{page}</strong> of <strong style={{ color: "#0f172a" }}>{totalPages}</strong>{" · "}{filtered.length} result{filtered.length !== 1 ? "s" : ""}
                   </p>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button 
-                      onClick={() => setPage(p => Math.max(1, p - 1))} 
-                      disabled={page === 1} 
-                      style={{ 
-                        width: 36, height: 36, border: "1px solid #e2e8f0", 
-                        borderRadius: 10, background: "#fff", 
-                        cursor: page === 1 ? "default" : "pointer", 
-                        opacity: page === 1 ? 0.4 : 1, 
-                        display: "flex", alignItems: "center", justifyContent: "center", 
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      style={{
+                        width: 36, height: 36, border: "1px solid #e2e8f0",
+                        borderRadius: 10, background: "#fff",
+                        cursor: page === 1 ? "default" : "pointer",
+                        opacity: page === 1 ? 0.4 : 1,
+                        display: "flex", alignItems: "center", justifyContent: "center",
                         color: "#475569", transition: "all 0.2s"
                       }}
                     ><Icon type="chevL" size={16} /></button>
@@ -5146,16 +5147,16 @@ export default function App() {
                       let p = i + 1;
                       if (totalPages > 5) { const start = Math.max(1, Math.min(page - 2, totalPages - 4)); p = start + i; }
                       return (
-                        <button 
-                          key={p} 
-                          onClick={() => setPage(p)} 
-                          style={{ 
-                            width: 36, height: 36, 
-                            border: p === page ? "none" : "1px solid #e2e8f0", 
-                            borderRadius: 10, 
-                            background: p === page ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "#fff", 
-                            color: p === page ? "#fff" : "#475569", 
-                            cursor: "pointer", fontSize: 13, 
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          style={{
+                            width: 36, height: 36,
+                            border: p === page ? "none" : "1px solid #e2e8f0",
+                            borderRadius: 10,
+                            background: p === page ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "#fff",
+                            color: p === page ? "#fff" : "#475569",
+                            cursor: "pointer", fontSize: 13,
                             fontWeight: p === page ? 600 : 500,
                             transition: "all 0.2s",
                             boxShadow: p === page ? "0 2px 8px rgba(37,99,235,0.3)" : "none"
@@ -5163,15 +5164,15 @@ export default function App() {
                         >{p}</button>
                       );
                     })}
-                    <button 
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
-                      disabled={page === totalPages} 
-                      style={{ 
-                        width: 36, height: 36, border: "1px solid #e2e8f0", 
-                        borderRadius: 10, background: "#fff", 
-                        cursor: page === totalPages ? "default" : "pointer", 
-                        opacity: page === totalPages ? 0.4 : 1, 
-                        display: "flex", alignItems: "center", justifyContent: "center", 
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      style={{
+                        width: 36, height: 36, border: "1px solid #e2e8f0",
+                        borderRadius: 10, background: "#fff",
+                        cursor: page === totalPages ? "default" : "pointer",
+                        opacity: page === totalPages ? 0.4 : 1,
+                        display: "flex", alignItems: "center", justifyContent: "center",
                         color: "#475569", transition: "all 0.2s"
                       }}
                     ><Icon type="chevR" size={16} /></button>
