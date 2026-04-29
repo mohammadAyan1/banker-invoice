@@ -2800,30 +2800,14 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { useState, useEffect, useMemo, useRef } from "react";
 import { loginService, logoutService } from "./services/loginService";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 
-// const URL = "http://localhost:5000"
-const URL = "https://banker-backend-8ttk.onrender.com"
+// const URL = "t:5000"
+const URL = import.meta.env.VITE_BACKEND_URL
+// const URL = "https://banker-backend-8ttk.onrender.com"
 const API_URL = `${URL}/api/case/summary-data`;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -2837,6 +2821,10 @@ function getAddress(c) {
 
 function getDateOfVisit(c) {
   return c.createdAt || c.dateOfVisit || c.visitDate || c.header?.dateOfVisit || c.dateOfReport || c.inspectionDate || null;
+}
+
+function getCity(c) {
+  return c.city || c.location || c.propertyCity || c.locationDetails?.city || "N/A";
 }
 
 function formatDate(raw) {
@@ -2861,6 +2849,7 @@ function normalizeCase(c, section) {
     bankSlug: c.bankSlug || "",
     customerName: getCustomerName(c),
     address: getAddress(c),
+    city: getCity(c),
     createdDateRaw: c.createdAt || null,
     visitDateRaw: vDate,
     dateOfVisitRaw: c.createdAt || vDate,
@@ -2884,215 +2873,147 @@ function normalizeCase(c, section) {
   };
 }
 
-// ── Default PDF invoice data (fallback when DB has no field) ─────────────────
+// ── Row color helper ─────────────────────────────────────────────────────────
+const getRowColor = (status, createdDateRaw) => {
+  if (!status) return { backgroundColor: "transparent", className: "" };
+  const statusLower = status.toLowerCase();
+  if ((statusLower === "pending") && createdDateRaw) {
+    const created = new Date(createdDateRaw);
+    const now = new Date();
+    const hoursDiff = (now - created) / (1000 * 60 * 60);
+    if (hoursDiff > 48) return { backgroundColor: "#FEE2E2", className: "blink-row" };
+  }
+  if (statusLower === "finalsubmitted" || statusLower === "submitted") return { backgroundColor: "#DCFCE7", className: "" };
+  if (statusLower === "work in progress" || statusLower === "assigned" || statusLower === "working") return { backgroundColor: "#FEF9C3", className: "" };
+  if (statusLower === "cancelled") return { backgroundColor: "#F3F4F6", className: "" };
+  return { backgroundColor: "transparent", className: "" };
+};
+
+// ── BANK DEFAULTS ─────────────────────────────────────────────────────────────
 const BANK_DEFAULTS = {
   "Utkarsh Small Finance Bank": {
-    invoiceNo: "116/2025-26",
-    invoiceDate: "04.08.2025",
-    billMonth: "Jul-25",
+    invoiceNo: "116/2025-26", invoiceDate: "04.08.2025", billMonth: "Jul-25",
     receiverName: "Utkarsh Small Finance Bank",
     receiverAddress: "Shop No. G-1, G-6, G-9, Ground Floor, Mangal City Mall & Hotel, Plot No -A-1, Scheme No 54, PU -4 Commercial, Indore- 452010",
-    receiverGSTIN: "23AABCU9355J1Z2",
-    receiverStateCode: "23",
-    sacCode: "998331",
-    bankPayment: "ICICI BANK LTD",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AABCU9355J1Z2", receiverStateCode: "23", sacCode: "998331",
+    bankPayment: "ICICI BANK LTD", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "lanNo", "dateOfVisit", "customerName", "propertyAddress", "distanceKm", "caseType", "baseAmount", "total"],
     colLabels: ["Sr. No", "LAN. NO.", "Date of Visit", "Customer Name", "Property Address", "Distance IN KM", "Case Type", "Base Amount", "Total"],
   },
   "Sundaram Home Finance Limited": {
-    invoiceNo: "126/2025-26",
-    invoiceDate: "05.08.2025",
-    billMonth: "Jul.25",
+    invoiceNo: "126/2025-26", invoiceDate: "05.08.2025", billMonth: "Jul.25",
     receiverName: "Sundaram Home Finance Limited",
     receiverAddress: "Plot no. 9/1/3 EMBASSY BUILDING, 3RD FLOOR (NEAR TREASURE IS LAND MALL) M.G. ROAD| INDORE – 452001",
-    receiverGSTIN: "23AADCS4826J1ZC",
-    receiverStateCode: "23",
-    sacCode: "998331",
-    bankPayment: "ICICI BANK LTD",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AADCS4826J1ZC", receiverStateCode: "23", sacCode: "998331",
+    bankPayment: "ICICI BANK LTD", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "fileNo", "customerName", "propertyAddress", "dateOfVisit", "caseType", "propertyType", "area", "location", "pincode", "amount"],
     colLabels: ["S. NO", "FILE NO", "NAME OF CUSTOMER", "ADDRESS OF PROPERTY", "DATE OF PROPERTY VISIT", "TYPE OF PROPERTY CASE", "PROPERTY TYPE", "PLOT/BUILT UP AREA (SQFT)", "LOCATION", "PINCODE", "AMOUNT"],
   },
   "Profectus Capital Private Limited": {
-    invoiceNo: "121/2025-26",
-    invoiceDate: "05.08.2025",
-    billMonth: "Jul-25",
+    invoiceNo: "121/2025-26", invoiceDate: "05.08.2025", billMonth: "Jul-25",
     receiverName: "PROFECTUS CAPITAL PRIVATE LIMITED",
     receiverAddress: "3rd Floor, 305 / 306, Parekh Heights, New Palasia, New Palasia, Indore, Indore, Madhya Pradesh, 452001",
-    receiverGSTIN: "23AAJCP2396N1ZW",
-    receiverStateCode: "23",
-    sacCode: "998331",
-    bankPayment: "ICICI BANK LTD",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AAJCP2396N1ZW", receiverStateCode: "23", sacCode: "998331",
+    bankPayment: "ICICI BANK LTD", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "lanNo", "dateOfVisit", "customerName", "caseType", "propertyAddress", "distanceKm", "area", "propertyType", "feesInRs", "distCharges", "profFeesCharge"],
     colLabels: ["Sr. No", "LAN. NO.", "Date of Visit", "Customer Name", "Case Type", "Property Address", "Distance In KM", "Plot/Built Up Area", "Property Type", "Fees In (RS)", "Dist. Charges", "Prof. Fees Charge"],
   },
   "Piramal Finance Limited": {
-    invoiceNo: "114/2025-26",
-    invoiceDate: "04.08.2025",
-    billMonth: "Jul.25",
+    invoiceNo: "114/2025-26", invoiceDate: "04.08.2025", billMonth: "Jul.25",
     receiverName: "Piramal Finance Limited",
     receiverAddress: "F.F-17,16, ORION TOWER,PLOT NO.11, CITY CENTER, NEXT TO LIC BUILDING, GWALIOR, -474011 MADHYA PRADESH",
-    receiverGSTIN: "23AAACD1977A1Z7",
-    receiverStateCode: "23",
-    sacCode: "998331",
-    bankPayment: "ICICI BANK LTD",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AAACD1977A1Z7", receiverStateCode: "23", sacCode: "998331",
+    bankPayment: "ICICI BANK LTD", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "lanNo", "dateOfVisit", "customerName", "propertyAddress", "caseType", "location", "profFeesCharge"],
     colLabels: ["Sr. No", "LAN. NO.", "Date of Visit", "Customer Name", "Property Address", "Case Type", "Location", "Prof. Fees Charge"],
   },
   "Nido Home Finance Limited": {
-    invoiceNo: "128/2025-26",
-    invoiceDate: "05.08.2025",
-    billMonth: "Jul-25",
+    invoiceNo: "128/2025-26", invoiceDate: "05.08.2025", billMonth: "Jul-25",
     receiverName: "NIDO HOME FINANCE LIMITED",
     receiverAddress: "406, 407 D M Tower Fourth Floor, Race course road, Near Janzeer Wala Square, Indore 452001",
-    receiverGSTIN: "23AABCE9808N1ZC",
-    receiverStateCode: "23",
-    sacCode: "00440173",
-    bankPayment: "STATE BANK OF INDIA",
-    accountNo: "36052667013",
-    ifscCode: "SBIN0030450",
-    branchAddress: "SCHEME NO. 54, A.B.ROAD, INDORE",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AABCE9808N1ZC", receiverStateCode: "23", sacCode: "00440173",
+    bankPayment: "STATE BANK OF INDIA", accountNo: "36052667013", ifscCode: "SBIN0030450",
+    branchAddress: "SCHEME NO. 54, A.B.ROAD, INDORE", taxType: "CGST+SGST",
     columns: ["srNo", "branchName", "applicationId", "customerName", "propertyCity", "distanceKm", "caseType", "initiationDate", "basicFee", "totalFees", "propertyAddress"],
     colLabels: ["Sr.No.", "Branch Name", "Application ID", "Applicant Name", "Property City", "Distance in KM", "Case Type", "Initiation Date", "Basic Fee", "Total Fees", "Property Address"],
   },
   "Manappuram Home Finance Limited": {
-    invoiceNo: "135/2025-26",
-    invoiceDate: "12.08.2025",
-    billMonth: "Jun-25",
+    invoiceNo: "135/2025-26", invoiceDate: "12.08.2025", billMonth: "Jun-25",
     receiverName: "Manappuram Home Finance Limited",
     receiverAddress: "1st Floor, Shop - 4A, Royal Gold Building, Yaswant Nivas Road, Indore, Indore, Madhya Pradesh - 452001",
-    receiverGSTIN: "23AAGCM7846R1ZP",
-    receiverStateCode: "23",
-    sacCode: "998331",
-    bankPayment: "AU SMALL FINANCE BANK",
-    accountNo: "1821231316314808",
-    ifscCode: "AUBL0002313",
-    branchAddress: "SD ARCADE, UPPER GROUND FLOOR, PLOT PO 3, SCHEME- 54 AB ROAD INDORE 452010 M.P",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AAGCM7846R1ZP", receiverStateCode: "23", sacCode: "998331",
+    bankPayment: "AU SMALL FINANCE BANK", accountNo: "1821231316314808", ifscCode: "AUBL0002313",
+    branchAddress: "SD ARCADE, UPPER GROUND FLOOR, PLOT PO 3, SCHEME- 54 AB ROAD INDORE 452010 M.P", taxType: "CGST+SGST",
     columns: ["srNo", "refNo", "dateOfVisit", "customerName", "propertyAddress", "distanceKm", "caseType", "baseAmount", "total"],
     colLabels: ["Sr. No", "REF. NO.", "Date of Visit", "Customer Name", "Property Address", "Distance IN KM", "Case Type", "Base Amount", "Total"],
   },
   "ICICI Bank": {
-    invoiceNo: "129/2025-26",
-    invoiceDate: "08-08-25",
-    billMonth: "Jul-25",
+    invoiceNo: "129/2025-26", invoiceDate: "08-08-25", billMonth: "Jul-25",
     receiverName: "ICICI BANK LTD.",
     receiverAddress: "286 M.G. ROAD GORAKHUND CHAURAHA, INDORE – 452002",
-    receiverGSTIN: "23AAACI1195H1ZU",
-    receiverStateCode: "23",
-    sacCode: "998331",
-    bankPayment: "ICICI BANK",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AAACI1195H1ZU", receiverStateCode: "23", sacCode: "998331",
+    bankPayment: "ICICI BANK", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "processShop", "applicationNo", "itemsId", "requestId", "customerName", "businessGroup", "costCenter", "requestType", "transactionType", "initiationDate", "totalVisits", "baseRate", "distanceCategory", "distanceCovered", "variableRate", "totalAmount"],
     colLabels: ["Sr No", "Process Shop/Location", "Application No", "Ilens Id", "Request Id", "Customer Name", "Business Group", "Cost center", "Request Type", "Transaction type", "Initiation Date", "Total Visits", "Base Rate", "Distance Category", "Distance Covered", "Variable Rate", "Total Amount"],
   },
   "Home First Housing Finance Limited": {
-    invoiceNo: "131/2025-26",
-    invoiceDate: "08.08.2025",
-    billMonth: "Jun-25",
+    invoiceNo: "131/2025-26", invoiceDate: "08.08.2025", billMonth: "Jun-25",
     receiverName: "HOME FIRST HOUSING FINANCE LIMITED",
     receiverAddress: "HOME FIRST HOUSING FINANCE LIMITED INDIA BHOPAL ZONE MADHYA PRADESH-462011",
-    receiverGSTIN: "23AACCH3317E127",
-    receiverStateCode: "MP",
-    sacCode: "998331",
-    bankPayment: "ICICI BANK LTD",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AACCH3317E127", receiverStateCode: "MP", sacCode: "998331",
+    bankPayment: "ICICI BANK LTD", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "customerName", "lanNo", "dateOfVisit", "propertyAddress", "caseType", "location", "profFeesCharge"],
     colLabels: ["Sr. No", "Customer Name", "LAN. NO.", "Date of Visit", "Property Address", "Case Type", "Location", "Prof. Fees Charge"],
   },
   "ICICI Home Finance Company Ltd": {
-    invoiceNo: "130202526",
-    invoiceDate: "08 Aug 2025",
-    billMonth: "Jul-25",
+    invoiceNo: "130202526", invoiceDate: "08 Aug 2025", billMonth: "Jul-25",
     receiverName: "ICICI Home Finance Company Ltd",
     receiverAddress: "301, 3rd Floor, Dehradun-248009-Uttarakhand",
-    receiverGSTIN: "05AAACI6285N1Z6",
-    receiverStateCode: "05",
-    sacCode: "9983",
-    bankPayment: "ICICI BANK",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "IGST",
+    receiverGSTIN: "05AAACI6285N1Z6", receiverStateCode: "05", sacCode: "9983",
+    bankPayment: "ICICI BANK", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "IGST",
     columns: ["srNo", "agreementNo", "disbursementNo", "disbursedDate", "distanceAmount", "brokerId", "customerName", "loanScheme", "finalPO", "srNoDetails"],
     colLabels: ["Sr.No", "Agreement No", "Disbursement No/Request No", "Disbursed Date", "Disbursed Amount/Distance Amount", "Broker ID", "Customer Name", "Loan Scheme/Service Type", "Final PO", "SR No/Details"],
   },
   "Fedbank Financial Services Limited": {
-    invoiceNo: "118/2025-26",
-    invoiceDate: "04.08.2025",
-    billMonth: "Jul-25",
+    invoiceNo: "118/2025-26", invoiceDate: "04.08.2025", billMonth: "Jul-25",
     receiverName: "FEDBANK FINANCIAL SERVICES LIMITED",
     receiverAddress: "BRANCH - BHOPAL",
-    receiverGSTIN: "23AAACF8662J1ZI",
-    receiverStateCode: "23",
-    sacCode: "998399",
-    bankPayment: "ICICI BANK LTD",
-    accountNo: "004105017837",
-    ifscCode: "ICIC0000041",
-    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AAACF8662J1ZI", receiverStateCode: "23", sacCode: "998399",
+    bankPayment: "ICICI BANK LTD", accountNo: "004105017837", ifscCode: "ICIC0000041",
+    branchAddress: "Malav Parisar Branch Indore M.P Pincode- 452008", taxType: "CGST+SGST",
     columns: ["srNo", "dateOfVisit", "caseType", "customerName", "propertyAddress", "location", "dealNo", "basicCharges", "distanceCharges", "totalAmount", "cgst9", "sgst9", "total"],
     colLabels: ["S. NO", "DATE OF PROPERTY VISIT", "TYPE OF PROPERTY CASE", "NAME OF CUSTOMER", "ADDRESS OF PROPERTY", "LOCATION", "Deal No.", "Basic Charges", "Distance Charges", "Total Amount", "CGST 9%", "SGST 9%", "Total"],
   },
   "Bajaj Housing Finance Limited": {
-    invoiceNo: "125/2025-26",
-    invoiceDate: "05.08.2025",
-    billMonth: "JULY 2025",
+    invoiceNo: "125/2025-26", invoiceDate: "05.08.2025", billMonth: "JULY 2025",
     receiverName: "BAJAJ HOUSING FINANCE LIMITED",
     receiverAddress: "Off. Nos. 605, 606, 607-A, 607-B, 6th Floor, Airen Heights, Plot No.13-14, P.U.3, Scheme No. 54, INDORE, Indore, Madhya Pradesh, 452001",
-    receiverGSTIN: "23AADCB6018P1ZL",
-    receiverStateCode: "23",
-    sacCode: "9972",
-    bankPayment: "STATE BANK OF INDIA",
-    accountNo: "36052667013",
-    ifscCode: "SBIN0030450",
-    branchAddress: "SCHEME NO. 54, A.B.ROAD, INDORE",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "23AADCB6018P1ZL", receiverStateCode: "23", sacCode: "9972",
+    bankPayment: "STATE BANK OF INDIA", accountNo: "36052667013", ifscCode: "SBIN0030450",
+    branchAddress: "SCHEME NO. 54, A.B.ROAD, INDORE", taxType: "CGST+SGST",
     columns: ["srNo", "applicationId", "customerName", "propertyAddress", "dateOfVisit", "caseType", "location", "transactionAmount", "cgst", "sgst"],
     colLabels: ["S.NO.", "APPLICATION ID", "CUSTOMER NAME", "ADDRESS", "DATE OF VISIT", "CASE TYPE", "LOCATION", "Transaction Amount", "CGST", "SGST"],
   },
   "Aadhar Housing Finance": {
-    invoiceNo: "136/2025-26",
-    invoiceDate: "12.08.2025",
-    billMonth: "Aug-25",
+    invoiceNo: "136/2025-26", invoiceDate: "12.08.2025", billMonth: "Aug-25",
     receiverName: "Aadhar Housing Finance",
     receiverAddress: "206 & 207, 2nd floor, Megapolis Square, Above Tanishq Showroom. 579, MG Road Indore",
-    receiverGSTIN: "27AABCV5640B2ZL",
-    receiverStateCode: "27",
-    sacCode: "998331",
-    bankPayment: "STATE BANK OF INDIA",
-    accountNo: "36052667013",
-    ifscCode: "SBIN0030450",
-    branchAddress: "SCHEME NO. 54, A.B.ROAD, INDORE",
-    taxType: "CGST+SGST",
+    receiverGSTIN: "27AABCV5640B2ZL", receiverStateCode: "27", sacCode: "998331",
+    bankPayment: "STATE BANK OF INDIA", accountNo: "36052667013", ifscCode: "SBIN0030450",
+    branchAddress: "SCHEME NO. 54, A.B.ROAD, INDORE", taxType: "CGST+SGST",
     columns: ["srNo", "branchName", "appNo", "customerName", "billType", "distanceKm", "dateOfVisit", "baseAmount"],
     colLabels: ["Sr. No.", "Branch Name", "App NO.", "Customer Name", "Bill type", "Distance From Branch in KM", "Date Of Visit", "Base Amount"],
   },
 };
 
-// ── VENDOR INFO (common) ─────────────────────────────────────────────────────
+// ── VENDOR INFO ───────────────────────────────────────────────────────────────
 const VENDOR = {
   name: "M/s. Unique Engineering & Associates",
   address: "Office No.102, Plot No.2 Swadesh Bhawan, Indore, Indore, Madhya Pradesh, 452001",
@@ -3102,7 +3023,6 @@ const VENDOR = {
   stateCode: "23",
 };
 
-// ── Map DB bankName → BANK_DEFAULTS key ──────────────────────────────────────
 function getBankDefault(bankName) {
   const map = {
     "utkarsh": "Utkarsh Small Finance Bank",
@@ -3129,75 +3049,6 @@ function getBankDefault(bankName) {
   return null;
 }
 
-// ── Build default rows for a case based on bank ──────────────────────────────
-function buildDefaultRow(c, bankKey) {
-  const d = BANK_DEFAULTS[bankKey];
-  if (!d) return {};
-  const base = c.basicFee || c.totalFee || 1200;
-  const dist = c.distanceCharge || 0;
-  const total = base + dist;
-  const cgst = Math.round(total * 0.09 * 100) / 100;
-
-  return {
-    srNo: "",
-    lanNo: c.refNo !== "—" ? c.refNo : "",
-    fileNo: c.refNo !== "—" ? c.refNo : "",
-    dateOfVisit: c.dateOfVisitFormatted !== "—" ? c.dateOfVisitFormatted : "",
-    customerName: c.customerName !== "—" ? c.customerName : "",
-    propertyAddress: c.address !== "—" ? c.address : "",
-    distanceKm: c.distance || "",
-    caseType: c.caseType !== "—" ? c.caseType : "",
-    location: c.location !== "—" ? c.location : "",
-    propertyType: c.propertyType !== "—" ? c.propertyType : "",
-    area: c.area || "",
-    baseAmount: base,
-    distCharges: dist,
-    feesInRs: base,
-    profFeesCharge: base,
-    basicCharges: base,
-    distanceCharges: dist,
-    totalAmount: total,
-    total: total,
-    amount: total,
-    cgst9: cgst,
-    sgst9: cgst,
-    cgst: cgst,
-    sgst: cgst,
-    applicationId: c.applicationId || "",
-    appNo: c.applicationId || "",
-    dealNo: c.dealNo || "",
-    branchName: "",
-    propertyCity: c.location !== "—" ? c.location : "",
-    initiationDate: c.dateOfVisitFormatted !== "—" ? c.dateOfVisitFormatted : "",
-    basicFee: base,
-    totalFees: total,
-    pincode: "",
-    processShop: "",
-    applicationNo: c.applicationId || "",
-    itemsId: "",
-    requestId: "",
-    businessGroup: "",
-    costCenter: "",
-    requestType: "",
-    transactionType: "",
-    totalVisits: 1,
-    baseRate: 1000,
-    distanceCategory: "",
-    distanceCovered: c.distance || "",
-    variableRate: dist,
-    agreementNo: c.refNo !== "—" ? c.refNo : "",
-    disbursementNo: "",
-    disbursedDate: c.dateOfVisitFormatted !== "—" ? c.dateOfVisitFormatted : "",
-    distanceAmount: dist,
-    brokerId: "",
-    loanScheme: c.caseType !== "—" ? c.caseType : "",
-    finalPO: total,
-    srNoDetails: "",
-    billType: "FRESH",
-    refNo: c.refNo !== "—" ? c.refNo : "",
-  };
-}
-
 // ── NAV ICONS ─────────────────────────────────────────────────────────────────
 function Icon({ type, size = 18 }) {
   const paths = {
@@ -3214,6 +3065,7 @@ function Icon({ type, size = 18 }) {
     close: "M6 18L18 6M6 6l12 12",
     bulkInvoice: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
     calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+    excel: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM14 2v6h6M8 13h8M8 17h8",
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: size, height: size, flexShrink: 0 }}>
@@ -3259,13 +3111,8 @@ function MultiSelect({ options, selectedValues, onChange, placeholder = "Select.
     onChange(newSelected);
   };
 
-  const selectAll = () => {
-    onChange([...options.map(o => o.value)]);
-  };
-
-  const clearAll = () => {
-    onChange([]);
-  };
+  const selectAll = () => onChange([...options.map(o => o.value)]);
+  const clearAll = () => onChange([]);
 
   const displayText = selectedValues.length === 0
     ? placeholder
@@ -3278,98 +3125,40 @@ function MultiSelect({ options, selectedValues, onChange, placeholder = "Select.
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          width: "100%",
-          padding: "8px 12px",
-          border: "1px solid #e2e8f0",
-          borderRadius: "8px",
+          width: "100%", padding: "8px 12px", border: "1px solid #e2e8f0", borderRadius: "8px",
           background: selectedValues.length > 0 ? "#eff6ff" : "#fff",
           color: selectedValues.length > 0 ? "#1e40af" : "#64748b",
-          cursor: "pointer",
-          fontSize: "13px",
-          textAlign: "left",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "8px",
-          transition: "all 0.2s",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+          cursor: "pointer", fontSize: "13px", textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px",
+          transition: "all 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
         }}
         onMouseEnter={(e) => e.target.style.borderColor = "#93c5fd"}
         onMouseLeave={(e) => e.target.style.borderColor = "#e2e8f0"}
       >
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-          {displayText}
-        </span>
-        <span style={{ fontSize: "10px", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
-          ▼
-        </span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{displayText}</span>
+        <span style={{ fontSize: "10px", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▼</span>
       </button>
 
       {isOpen && (
         <div style={{
-          position: "absolute",
-          top: "100%",
-          left: 0,
-          right: 0,
-          marginTop: "4px",
-          background: "#fff",
-          border: "1px solid #e2e8f0",
-          borderRadius: "8px",
-          boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-          zIndex: 1000,
-          maxHeight: "280px",
-          overflow: "hidden",
-          animation: "slideDown 0.2s ease"
+          position: "absolute", top: "100%", left: 0, right: 0, marginTop: "4px",
+          background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.15)", zIndex: 1000,
+          maxHeight: "280px", overflow: "hidden", animation: "slideDown 0.2s ease"
         }}>
-          <div style={{
-            padding: "8px",
-            borderBottom: "1px solid #e2e8f0",
-            display: "flex",
-            gap: "8px"
-          }}>
-            <button onClick={selectAll} style={{
-              flex: 1, padding: "6px 8px", fontSize: "11px",
-              background: "#eff6ff", border: "1px solid #bfdbfe",
-              borderRadius: "6px", cursor: "pointer", color: "#1e40af",
-              fontWeight: 500, transition: "all 0.15s"
-            }}>
-              Select All
-            </button>
-            <button onClick={clearAll} style={{
-              flex: 1, padding: "6px 8px", fontSize: "11px",
-              background: "#fef2f2", border: "1px solid #fecaca",
-              borderRadius: "6px", cursor: "pointer", color: "#dc2626",
-              fontWeight: 500, transition: "all 0.15s"
-            }}>
-              Clear All
-            </button>
+          <div style={{ padding: "8px", borderBottom: "1px solid #e2e8f0", display: "flex", gap: "8px" }}>
+            <button onClick={selectAll} style={{ flex: 1, padding: "6px 8px", fontSize: "11px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", cursor: "pointer", color: "#1e40af", fontWeight: 500 }}>Select All</button>
+            <button onClick={clearAll} style={{ flex: 1, padding: "6px 8px", fontSize: "11px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", cursor: "pointer", color: "#dc2626", fontWeight: 500 }}>Clear All</button>
           </div>
           <div style={{ maxHeight: "220px", overflowY: "auto", padding: "4px" }}>
             {options.map(option => (
-              <label
-                key={option.value}
-                style={{
-                  display: "flex", alignItems: "center", padding: "8px 12px",
-                  cursor: "pointer", borderRadius: "6px",
-                  background: selectedValues.includes(option.value) ? "#eff6ff" : "transparent",
-                  transition: "all 0.15s", fontSize: "13px", margin: "2px 0"
-                }}
-                onMouseEnter={(e) => {
-                  if (!selectedValues.includes(option.value)) e.currentTarget.style.background = "#f8fafc";
-                }}
-                onMouseLeave={(e) => {
-                  if (!selectedValues.includes(option.value)) e.currentTarget.style.background = "transparent";
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedValues.includes(option.value)}
-                  onChange={() => toggleOption(option.value)}
-                  style={{ marginRight: "8px", cursor: "pointer", accentColor: "#2563eb" }}
-                />
-                <span style={{ color: selectedValues.includes(option.value) ? "#1e40af" : "#374151", fontWeight: selectedValues.includes(option.value) ? "500" : "400" }}>
-                  {option.label}
-                </span>
+              <label key={option.value} style={{
+                display: "flex", alignItems: "center", padding: "8px 12px", cursor: "pointer",
+                borderRadius: "6px", background: selectedValues.includes(option.value) ? "#eff6ff" : "transparent",
+                transition: "all 0.15s", fontSize: "13px", margin: "2px 0"
+              }}>
+                <input type="checkbox" checked={selectedValues.includes(option.value)} onChange={() => toggleOption(option.value)} style={{ marginRight: "8px", cursor: "pointer", accentColor: "#2563eb" }} />
+                <span style={{ color: selectedValues.includes(option.value) ? "#1e40af" : "#374151", fontWeight: selectedValues.includes(option.value) ? "500" : "400" }}>{option.label}</span>
               </label>
             ))}
           </div>
@@ -3393,131 +3182,62 @@ function useMediaQuery(query) {
 
 const PAGE_SIZE = 10;
 
+// ── MONTH OPTIONS — value is the month INDEX (0-11) ──────────────────────────
+// FIX: value is now a NUMBER (0-11) so it matches d.getMonth() correctly
+const MONTH_OPTIONS = [
+  { label: "January", value: 0 },
+  { label: "February", value: 1 },
+  { label: "March", value: 2 },
+  { label: "April", value: 3 },
+  { label: "May", value: 4 },
+  { label: "June", value: 5 },
+  { label: "July", value: 6 },
+  { label: "August", value: 7 },
+  { label: "September", value: 8 },
+  { label: "September", value: 8 },
+  { label: "October", value: 9 },
+  { label: "November", value: 10 },
+  { label: "December", value: 11 },
+];
+
 // ── LOGIN COMPONENT ───────────────────────────────────────────────────────────
 function LoginPage({ onLogin, error, loading }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onLogin(username, password);
-  };
+  const handleSubmit = (e) => { e.preventDefault(); onLogin(username, password); };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "20px"
-    }}>
-      <div style={{
-        background: "#fff",
-        borderRadius: "16px",
-        padding: "40px",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-        width: "100%",
-        maxWidth: "400px",
-        animation: "fadeInUp 0.5s ease"
-      }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", padding: "40px", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", width: "100%", maxWidth: "400px" }}>
         <div style={{ textAlign: "center", marginBottom: "30px" }}>
-          <div style={{
-            width: "64px",
-            height: "64px",
-            borderRadius: "16px",
-            background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 20px",
-            color: "#fff",
-            fontSize: "28px",
-            fontWeight: "bold",
-            boxShadow: "0 8px 24px rgba(37,99,235,0.3)"
-          }}>
-            U
-          </div>
-          <h2 style={{ margin: "0 0 8px", color: "#1e293b", fontSize: "24px", fontWeight: "600" }}>
-            Unique Engineering Invoice
-          </h2>
-          <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
-            Sign in to your account
-          </p>
+          <div style={{ width: "64px", height: "64px", borderRadius: "16px", background: "linear-gradient(135deg, #2563eb, #3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", color: "#fff", fontSize: "28px", fontWeight: "bold", boxShadow: "0 8px 24px rgba(37,99,235,0.3)" }}>U</div>
+          <h2 style={{ margin: "0 0 8px", color: "#1e293b", fontSize: "24px", fontWeight: "600" }}>Unique Engineering Invoice</h2>
+          <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Sign in to your account</p>
         </div>
-
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: "20px" }}>
-            <label style={{ display: "block", marginBottom: "8px", color: "#374151", fontSize: "14px", fontWeight: "500" }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin@gmail.com"
-              style={{
-                width: "100%", padding: "12px 16px", border: "1px solid #e2e8f0",
-                borderRadius: "10px", fontSize: "14px", outline: "none",
-                transition: "all 0.2s", boxSizing: "border-box",
-                background: "#f8fafc"
-              }}
+            <label style={{ display: "block", marginBottom: "8px", color: "#374151", fontSize: "14px", fontWeight: "500" }}>Email Address</label>
+            <input type="email" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin@gmail.com"
+              style={{ width: "100%", padding: "12px 16px", border: "1px solid #e2e8f0", borderRadius: "10px", fontSize: "14px", outline: "none", boxSizing: "border-box", background: "#f8fafc" }}
               onFocus={(e) => { e.target.style.borderColor = "#2563eb"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
               onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; }}
-              required
-            />
+              required />
           </div>
-
           <div style={{ marginBottom: "24px" }}>
-            <label style={{ display: "block", marginBottom: "8px", color: "#374151", fontSize: "14px", fontWeight: "500" }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              style={{
-                width: "100%", padding: "12px 16px", border: "1px solid #e2e8f0",
-                borderRadius: "10px", fontSize: "14px", outline: "none",
-                transition: "all 0.2s", boxSizing: "border-box",
-                background: "#f8fafc"
-              }}
+            <label style={{ display: "block", marginBottom: "8px", color: "#374151", fontSize: "14px", fontWeight: "500" }}>Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password"
+              style={{ width: "100%", padding: "12px 16px", border: "1px solid #e2e8f0", borderRadius: "10px", fontSize: "14px", outline: "none", boxSizing: "border-box", background: "#f8fafc" }}
               onFocus={(e) => { e.target.style.borderColor = "#2563eb"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
               onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; }}
-              required
-            />
+              required />
           </div>
-
-          {error && (
-            <div style={{
-              background: "#fef2f2", color: "#dc2626", padding: "12px 16px",
-              borderRadius: "10px", marginBottom: "20px", fontSize: "14px", textAlign: "center"
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              background: loading ? "#94a3b8" : "linear-gradient(135deg, #2563eb, #3b82f6)",
-              color: "#fff", border: "none", borderRadius: "10px", padding: "12px 16px",
-              fontSize: "15px", fontWeight: "600", cursor: loading ? "not-allowed" : "pointer",
-              transition: "all 0.2s", boxShadow: "0 4px 12px rgba(37,99,235,0.3)"
-            }}
-            onMouseOver={(e) => !loading && (e.target.style.transform = "translateY(-1px)")}
-            onMouseOut={(e) => !loading && (e.target.style.transform = "translateY(0)")}
-          >
+          {error && <div style={{ background: "#fef2f2", color: "#dc2626", padding: "12px 16px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", textAlign: "center" }}>{error}</div>}
+          <button type="submit" disabled={loading}
+            style={{ width: "100%", background: loading ? "#94a3b8" : "linear-gradient(135deg, #2563eb, #3b82f6)", color: "#fff", border: "none", borderRadius: "10px", padding: "12px 16px", fontSize: "15px", fontWeight: "600", cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
-
-        <div style={{ textAlign: "center", marginTop: "20px", fontSize: "12px", color: "#94a3b8" }}>
-          Unique Engineering & Associates © 2024
-        </div>
+        <div style={{ textAlign: "center", marginTop: "20px", fontSize: "12px", color: "#94a3b8" }}>Unique Engineering & Associates © 2024</div>
       </div>
     </div>
   );
@@ -3528,19 +3248,16 @@ const getTodayDate = () => {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 };
-
 const getCurrentBillMonth = () => {
   const d = new Date();
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
 };
-
 const getFiscalYear = () => {
   const d = new Date();
   const year = d.getFullYear();
   return (d.getMonth() + 1) >= 4 ? `${year}-${String(year + 1).slice(-2)}` : `${year - 1}-${String(year).slice(-2)}`;
 };
-
 const getDynamicInvoiceNo = (bankName = "") => {
   const fy = getFiscalYear();
   const cleanBank = (bankName || "GEN").replace(/\s+/g, "").toUpperCase();
@@ -3549,6 +3266,40 @@ const getDynamicInvoiceNo = (bankName = "") => {
   const newNo = String(Number(lastNo) + 1).padStart(3, '0');
   return `${newNo}-${cleanBank}-${fy}`;
 };
+
+function buildDefaultRow(c, bankKey) {
+  const d = BANK_DEFAULTS[bankKey];
+  if (!d) return {};
+  const base = c.basicFee || c.totalFee || 1200;
+  const dist = c.distanceCharge || 0;
+  const total = base + dist;
+  const cgst = Math.round(total * 0.09 * 100) / 100;
+  return {
+    srNo: "", lanNo: c.refNo !== "—" ? c.refNo : "", fileNo: c.refNo !== "—" ? c.refNo : "",
+    dateOfVisit: c.dateOfVisitFormatted !== "—" ? c.dateOfVisitFormatted : "",
+    customerName: c.customerName !== "—" ? c.customerName : "",
+    propertyAddress: c.address !== "—" ? c.address : "",
+    distanceKm: c.distance || "", caseType: c.caseType !== "—" ? c.caseType : "",
+    location: c.location !== "—" ? c.location : "",
+    propertyType: c.propertyType !== "—" ? c.propertyType : "",
+    area: c.area || "", baseAmount: base, distCharges: dist, feesInRs: base,
+    profFeesCharge: base, basicCharges: base, distanceCharges: dist,
+    totalAmount: total, total: total, amount: total, cgst9: cgst, sgst9: cgst,
+    cgst: cgst, sgst: cgst, applicationId: c.applicationId || "",
+    appNo: c.applicationId || "", dealNo: c.dealNo || "", branchName: "",
+    propertyCity: c.location !== "—" ? c.location : "",
+    initiationDate: c.dateOfVisitFormatted !== "—" ? c.dateOfVisitFormatted : "",
+    basicFee: base, totalFees: total, pincode: "", processShop: "",
+    applicationNo: c.applicationId || "", itemsId: "", requestId: "",
+    businessGroup: "", costCenter: "", requestType: "", transactionType: "",
+    totalVisits: 1, baseRate: 1000, distanceCategory: "",
+    distanceCovered: c.distance || "", variableRate: dist,
+    agreementNo: c.refNo !== "—" ? c.refNo : "", disbursementNo: "",
+    disbursedDate: c.dateOfVisitFormatted !== "—" ? c.dateOfVisitFormatted : "",
+    distanceAmount: dist, brokerId: "", loanScheme: c.caseType !== "—" ? c.caseType : "",
+    finalPO: total, srNoDetails: "", billType: "FRESH", refNo: c.refNo !== "—" ? c.refNo : "",
+  };
+}
 
 // ── INVOICE MODAL ─────────────────────────────────────────────────────────────
 function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
@@ -3563,7 +3314,6 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
     const storageKey = `lastNo_${cleanBank}_${fy}`;
     const nextNo = String(Number(localStorage.getItem(storageKey) || "0") + 1).padStart(3, '0');
     const invoiceNo = `${nextNo}-${cleanBank}-${fy}`;
-
     return (cases || []).map((c, i) => {
       const dr = buildDefaultRow(c, bankKey);
       const row = {};
@@ -3576,15 +3326,10 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
   };
 
   const [rows, setRows] = useState(existingInvoice ? (existingInvoice.rows || []) : buildRows);
-
   const [invoiceMeta, setInvoiceMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.invoice : {
-    invoiceNo: getDynamicInvoiceNo(bankName),
-    invoiceDate: getTodayDate(),
-    billMonth: getCurrentBillMonth(),
-    receiverName: defaults.receiverName,
-    receiverAddress: defaults.receiverAddress,
-    receiverGSTIN: defaults.receiverGSTIN,
-    sacCode: defaults.sacCode,
+    invoiceNo: getDynamicInvoiceNo(bankName), invoiceDate: getTodayDate(), billMonth: getCurrentBillMonth(),
+    receiverName: defaults.receiverName, receiverAddress: defaults.receiverAddress,
+    receiverGSTIN: defaults.receiverGSTIN, sacCode: defaults.sacCode,
   });
   const [companyMeta, setCompanyMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.company : {
     name: "UNIQUE ENGINEERING AND ASSOCIATE",
@@ -3595,39 +3340,22 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
   const [invoiceTitle, setInvoiceTitle] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.title : "TAX INVOICE");
   const [descriptionText, setDescriptionText] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.description : "Sub- Professional fees for property valuation");
   const [sectionTitles, setSectionTitles] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.sections : {
-    receiverTitle: "Details of Receiver (Billed to)",
-    vendorTitle: "Details Of Vendor",
-    bankTitle: "BANK DETAILS",
+    receiverTitle: "Details of Receiver (Billed to)", vendorTitle: "Details Of Vendor", bankTitle: "BANK DETAILS",
   });
   const [footerMeta, setFooterMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.footer : {
-    reverseCharge: "Whether TAX is payable under Reverse Charge - No",
-    signatureText: "Authorized Signature",
-    signatureName: "Bhart Sharma",
+    reverseCharge: "Whether TAX is payable under Reverse Charge - No", signatureText: "Authorized Signature", signatureName: "Bhart Sharma",
   });
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
-  const [refreshInvoices, setRefreshInvoices] = useState(0);
   const [vendorMeta, setVendorMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.vendor : {
-    name: VENDOR.name,
-    address: VENDOR.address,
-    gstin: VENDOR.gstin,
-    pan: VENDOR.pan,
-    state: VENDOR.state,
-    stateCode: VENDOR.stateCode,
+    name: VENDOR.name, address: VENDOR.address, gstin: VENDOR.gstin, pan: VENDOR.pan, state: VENDOR.state, stateCode: VENDOR.stateCode,
   });
   const [bankMeta, setBankMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.bank : {
-    customerName: "UNIQUE ENGINEERING AND ASSOCIATES",
-    bankName: defaults.bankPayment,
-    accountNo: defaults.accountNo,
-    branchAddress: defaults.branchAddress,
-    ifscCode: defaults.ifscCode,
-    panNumber: VENDOR.pan,
+    customerName: "UNIQUE ENGINEERING AND ASSOCIATES", bankName: defaults.bankPayment,
+    accountNo: defaults.accountNo, branchAddress: defaults.branchAddress,
+    ifscCode: defaults.ifscCode, panNumber: VENDOR.pan,
   });
-  const [taxMeta, setTaxMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.tax : {
-    cgstRate: 9,
-    sgstRate: 9,
-    igstRate: 18,
-  });
+  const [taxMeta, setTaxMeta] = useState((existingInvoice && existingInvoice.meta) ? existingInvoice.meta.tax : { cgstRate: 9, sgstRate: 9, igstRate: 18 });
   const [editableSubTotal, setEditableSubTotal] = useState(null);
   const [hiddenCols, setHiddenCols] = useState((existingInvoice && existingInvoice.meta) ? (existingInvoice.meta.hiddenCols || []) : []);
   const [customCols, setCustomCols] = useState((existingInvoice && existingInvoice.meta) ? (existingInvoice.meta.customCols || []) : []);
@@ -3637,64 +3365,32 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
   const printRef = useRef(null);
 
   const updateMeta = (key, val) => setInvoiceMeta(prev => ({ ...prev, [key]: val }));
-  const updateCompany = (key, val) => setCompanyMeta(prev => ({ ...prev, [key]: val }));
-  const updateFooter = (key, val) => setFooterMeta(prev => ({ ...prev, [key]: val }));
-  const updateVendor = (key, val) => setVendorMeta(prev => ({ ...prev, [key]: val }));
-  const updateBank = (key, val) => setBankMeta(prev => ({ ...prev, [key]: val }));
-  const updateTax = (key, val) => setTaxMeta(prev => ({ ...prev, [key]: val }));
-  const updateCell = (rowIdx, col, val) => {
-    setRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [col]: val } : r));
-  };
-  const deleteRow = (rowIdx) => {
-    setRows(prev => prev.filter((_, i) => i !== rowIdx));
-  };
-  const addRow = () => {
-    const newRow = {};
-    defaults.columns.forEach(col => newRow[col] = "");
-    newRow.invoiceNo = "NEW";
-    setRows(prev => [...prev, newRow]);
-  };
-
-  const toggleCol = (col) => {
-    setHiddenCols(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
-  };
-
+  const updateCell = (rowIdx, col, val) => setRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [col]: val } : r));
+  const deleteRow = (rowIdx) => setRows(prev => prev.filter((_, i) => i !== rowIdx));
+  const addRow = () => { const newRow = {}; defaults.columns.forEach(col => newRow[col] = ""); newRow.invoiceNo = "NEW"; setRows(prev => [...prev, newRow]); };
+  const toggleCol = (col) => setHiddenCols(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
   const addCustomCol = () => {
     if (!newColName.trim()) return;
-    if (defaults.columns.includes(newColName) || customCols.includes(newColName)) {
-      alert("Column already exists");
-      return;
-    }
+    if (defaults.columns.includes(newColName) || customCols.includes(newColName)) { alert("Column already exists"); return; }
     setCustomCols(prev => [...prev, newColName]);
     setColOrder(prev => [...prev, newColName]);
     setRows(prev => prev.map(r => ({ ...r, [newColName]: "" })));
     setNewColName("");
   };
-
   const moveCol = (col, direction) => {
     setColOrder(prev => {
       const idx = prev.indexOf(col);
       if (idx === -1) return prev;
       const newOrder = [...prev];
-      if (direction === "left" && idx > 0) {
-        [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-      } else if (direction === "right" && idx < newOrder.length - 1) {
-        [newOrder[idx + 1], newOrder[idx]] = [newOrder[idx], newOrder[idx + 1]];
-      }
+      if (direction === "left" && idx > 0) [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+      else if (direction === "right" && idx < newOrder.length - 1) [newOrder[idx + 1], newOrder[idx]] = [newOrder[idx], newOrder[idx + 1]];
       return newOrder;
     });
   };
-
   const removeCustomCol = (col) => {
     setCustomCols(prev => prev.filter(c => c !== col));
     setColOrder(prev => prev.filter(c => c !== col));
-    setRows(prev => {
-      return prev.map(r => {
-        const newR = { ...r };
-        delete newR[col];
-        return newR;
-      });
-    });
+    setRows(prev => prev.map(r => { const newR = { ...r }; delete newR[col]; return newR; }));
   };
 
   const calculatedSubTotal = rows.reduce((s, r) => {
@@ -3707,124 +3403,53 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
   const igstAmt = defaults.taxType === "IGST" ? Math.round(subTotal * (taxMeta.igstRate / 100) * 100) / 100 : 0;
   const grandTotal = subTotal + (defaults.taxType === "IGST" ? igstAmt : cgstAmt + sgstAmt);
 
-  // ── SAVE new invoice ──────────────────────────────────────────────────────
   async function handleSave() {
-    setSaving(true);
-    setSaveStatus(null);
+    setSaving(true); setSaveStatus(null);
     try {
       const payload = {
         bankName: firstCase ? firstCase.bankName : (existingInvoice ? existingInvoice.bankName : ""),
-        invoiceNo: invoiceMeta.invoiceNo,
-        invoiceDate: invoiceMeta.invoiceDate,
-        billMonth: invoiceMeta.billMonth,
-        totalAmount: grandTotal,
-        rows: rows,
-        meta: {
-          invoice: invoiceMeta,
-          company: companyMeta,
-          vendor: vendorMeta,
-          bank: bankMeta,
-          tax: taxMeta,
-          footer: footerMeta,
-          title: invoiceTitle,
-          description: descriptionText,
-          sections: sectionTitles,
-          customCols: customCols,
-          hiddenCols: hiddenCols,
-          colOrder: colOrder
-        }
+        invoiceNo: invoiceMeta.invoiceNo, invoiceDate: invoiceMeta.invoiceDate,
+        billMonth: invoiceMeta.billMonth, totalAmount: grandTotal, rows,
+        meta: { invoice: invoiceMeta, company: companyMeta, vendor: vendorMeta, bank: bankMeta, tax: taxMeta, footer: footerMeta, title: invoiceTitle, description: descriptionText, sections: sectionTitles, customCols, hiddenCols, colOrder }
       };
-
       const response = await fetch(`${URL}/api/invoices/save`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
-        credentials: "include",
-        body: JSON.stringify(payload)
+        method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+        credentials: "include", body: JSON.stringify(payload)
       });
-
       const result = await response.json();
       if (result.success) {
         setSaveStatus({ type: "success", msg: "Invoice saved successfully!" });
-
         const fy = getFiscalYear();
         const cleanBank = (bankName || "GEN").replace(/\s+/g, "").toUpperCase();
         const storageKey = `lastNo_${cleanBank}_${fy}`;
-        const currentInvoiceNo = invoiceMeta.invoiceNo;
-        if (currentInvoiceNo) {
-          const noPart = currentInvoiceNo.split('-')[0];
-          localStorage.setItem(storageKey, noPart);
-        }
-
-        setTimeout(() => {
-          onClose();
-          window.location.reload();
-        }, 1500);
-      } else {
-        setSaveStatus({ type: "error", msg: result.message || "Failed to save invoice" });
-      }
-    } catch (error) {
-      setSaveStatus({ type: "error", msg: "Network error while saving" });
-    } finally {
-      setSaving(false);
-    }
+        const noPart = invoiceMeta.invoiceNo?.split('-')[0];
+        if (noPart) localStorage.setItem(storageKey, noPart);
+        setTimeout(() => { onClose(); window.location.reload(); }, 1500);
+      } else { setSaveStatus({ type: "error", msg: result.message || "Failed to save invoice" }); }
+    } catch { setSaveStatus({ type: "error", msg: "Network error while saving" }); }
+    finally { setSaving(false); }
   }
 
-  // ── UPDATE existing invoice ───────────────────────────────────────────────
   async function handleUpdate() {
-    setSaving(true);
-    setSaveStatus(null);
+    setSaving(true); setSaveStatus(null);
     try {
       const payload = {
-        bankName: existingInvoice.bankName,
-        invoiceNo: invoiceMeta.invoiceNo,
-        invoiceDate: invoiceMeta.invoiceDate,
-        billMonth: invoiceMeta.billMonth,
-        totalAmount: grandTotal,
-        rows: rows,
-        meta: {
-          invoice: invoiceMeta,
-          company: companyMeta,
-          vendor: vendorMeta,
-          bank: bankMeta,
-          tax: taxMeta,
-          footer: footerMeta,
-          title: invoiceTitle,
-          description: descriptionText,
-          sections: sectionTitles,
-          customCols: customCols,
-          hiddenCols: hiddenCols,
-          colOrder: colOrder
-        }
+        bankName: existingInvoice.bankName, invoiceNo: invoiceMeta.invoiceNo,
+        invoiceDate: invoiceMeta.invoiceDate, billMonth: invoiceMeta.billMonth,
+        totalAmount: grandTotal, rows,
+        meta: { invoice: invoiceMeta, company: companyMeta, vendor: vendorMeta, bank: bankMeta, tax: taxMeta, footer: footerMeta, title: invoiceTitle, description: descriptionText, sections: sectionTitles, customCols, hiddenCols, colOrder }
       };
-
       const response = await fetch(`${URL}/api/invoices/${existingInvoice._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
-        credentials: "include",
-        body: JSON.stringify(payload)
+        method: "PUT", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+        credentials: "include", body: JSON.stringify(payload)
       });
-
       const result = await response.json();
       if (result.success) {
         setSaveStatus({ type: "success", msg: "Invoice updated successfully!" });
-        setTimeout(() => {
-          onClose();
-          window.location.reload();
-        }, 1500);
-      } else {
-        setSaveStatus({ type: "error", msg: result.message || "Failed to update invoice" });
-      }
-    } catch (error) {
-      setSaveStatus({ type: "error", msg: "Network error while updating" });
-    } finally {
-      setSaving(false);
-    }
+        setTimeout(() => { onClose(); window.location.reload(); }, 1500);
+      } else { setSaveStatus({ type: "error", msg: result.message || "Failed to update invoice" }); }
+    } catch { setSaveStatus({ type: "error", msg: "Network error while updating" }); }
+    finally { setSaving(false); }
   }
 
   function handlePrint() {
@@ -3842,9 +3467,7 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
       .meta-box div{margin-bottom:2px;}
       .meta-box b{display:inline-block;width:90px;}
       .parties{display:grid;grid-template-columns:1fr 1fr;gap:10px;border:1px solid #ccc;padding:8px;margin-bottom:8px;font-size:10px;clear:both;}
-      .party-box{}
       .party-box h3{font-size:10px;font-weight:700;border-bottom:1px solid #ccc;padding-bottom:3px;margin-bottom:4px;}
-      .sub-heading{font-size:10px;font-style:italic;color:#555;margin-bottom:6px;}
       table{width:100%;border-collapse:collapse;margin-bottom:8px;}
       th{background:#1a3a6b;color:#fff;padding:4px 6px;text-align:left;font-size:9px;}
       td{padding:4px 6px;border:0.5px solid #ccc;font-size:9px;vertical-align:top;}
@@ -3867,40 +3490,26 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
     try {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Invoice');
-
       try {
         const resp = await fetch("/logo.png");
         const blob = await resp.blob();
         const buffer = await blob.arrayBuffer();
-        const imageId = workbook.addImage({
-          buffer: buffer,
-          extension: 'png',
-        });
-        worksheet.addImage(imageId, {
-          tl: { col: 0, row: 0 },
-          ext: { width: 1000, height: 140 }
-        });
-        for (let i = 1; i <= 8; i++) {
-          worksheet.getRow(i).height = 25;
-        }
-      } catch (imgErr) {
-        console.error("Logo fetch error:", imgErr);
-      }
+        const imageId = workbook.addImage({ buffer, extension: 'png' });
+        worksheet.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 1000, height: 140 } });
+        for (let i = 1; i <= 8; i++) worksheet.getRow(i).height = 25;
+      } catch (imgErr) { console.error("Logo fetch error:", imgErr); }
 
       const startRow = 9;
-
       worksheet.getRow(startRow).values = [invoiceTitle];
       worksheet.getRow(startRow).font = { bold: true, size: 14, underline: true };
       worksheet.getRow(startRow).alignment = { horizontal: 'center' };
       worksheet.mergeCells(`A${startRow}:G${startRow}`);
-
       worksheet.getRow(startRow + 1).values = ["Invoice No:", invoiceMeta.invoiceNo, "", "Date:", invoiceMeta.invoiceDate];
       worksheet.getRow(startRow + 2).values = ["Bill Month:", invoiceMeta.billMonth];
 
       const partyRow = startRow + 4;
       worksheet.getRow(partyRow).values = [sectionTitles.receiverTitle.toUpperCase(), "", "", sectionTitles.vendorTitle.toUpperCase()];
       worksheet.getRow(partyRow).font = { bold: true };
-
       worksheet.getRow(partyRow + 1).values = ["Name:", invoiceMeta.receiverName, "", "Name:", vendorMeta.name];
       worksheet.getRow(partyRow + 2).values = ["Address:", invoiceMeta.receiverAddress, "", "Address:", vendorMeta.address];
       worksheet.getRow(partyRow + 3).values = ["GSTIN:", invoiceMeta.receiverGSTIN, "", "GSTIN:", vendorMeta.gstin];
@@ -3915,7 +3524,6 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
       header.values = headerRow;
       header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A3A6B' } };
-
       rows.forEach((r, i) => {
         const rowData = [r._srNo];
         colsToShow.forEach(col => rowData.push(r[col]));
@@ -3923,144 +3531,71 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
       });
 
       const bankStartRow = tableStartRow + rows.length + 3;
-
       worksheet.mergeCells(`A${bankStartRow}:C${bankStartRow}`);
       worksheet.getCell(`A${bankStartRow}`).value = sectionTitles.bankTitle || "BANK DETAILS";
       worksheet.getCell(`A${bankStartRow}`).font = { bold: true };
-
-      worksheet.getRow(bankStartRow + 1).getCell(1).value = "Customer Name:";
-      worksheet.getRow(bankStartRow + 1).getCell(2).value = bankMeta.customerName;
-
-      worksheet.getRow(bankStartRow + 2).getCell(1).value = "Bank Name:";
-      worksheet.getRow(bankStartRow + 2).getCell(2).value = bankMeta.bankName;
-
-      worksheet.getRow(bankStartRow + 3).getCell(1).value = "Account No.:";
-      worksheet.getRow(bankStartRow + 3).getCell(2).value = bankMeta.accountNo;
-
-      worksheet.getRow(bankStartRow + 4).getCell(1).value = "Branch Address:";
-      worksheet.getRow(bankStartRow + 4).getCell(2).value = bankMeta.branchAddress;
-
-      worksheet.getRow(bankStartRow + 5).getCell(1).value = "IFSC Code:";
-      worksheet.getRow(bankStartRow + 5).getCell(2).value = bankMeta.ifscCode;
-
-      worksheet.getRow(bankStartRow + 6).getCell(1).value = "PAN Number:";
-      worksheet.getRow(bankStartRow + 6).getCell(2).value = bankMeta.panNumber;
-
-      worksheet.getRow(bankStartRow).getCell(6).value = "SUB TOTAL";
-      worksheet.getRow(bankStartRow).getCell(7).value = subTotal;
+      worksheet.getRow(bankStartRow + 1).getCell(1).value = "Customer Name:"; worksheet.getRow(bankStartRow + 1).getCell(2).value = bankMeta.customerName;
+      worksheet.getRow(bankStartRow + 2).getCell(1).value = "Bank Name:"; worksheet.getRow(bankStartRow + 2).getCell(2).value = bankMeta.bankName;
+      worksheet.getRow(bankStartRow + 3).getCell(1).value = "Account No.:"; worksheet.getRow(bankStartRow + 3).getCell(2).value = bankMeta.accountNo;
+      worksheet.getRow(bankStartRow + 4).getCell(1).value = "Branch Address:"; worksheet.getRow(bankStartRow + 4).getCell(2).value = bankMeta.branchAddress;
+      worksheet.getRow(bankStartRow + 5).getCell(1).value = "IFSC Code:"; worksheet.getRow(bankStartRow + 5).getCell(2).value = bankMeta.ifscCode;
+      worksheet.getRow(bankStartRow + 6).getCell(1).value = "PAN Number:"; worksheet.getRow(bankStartRow + 6).getCell(2).value = bankMeta.panNumber;
+      worksheet.getRow(bankStartRow).getCell(6).value = "SUB TOTAL"; worksheet.getRow(bankStartRow).getCell(7).value = subTotal;
 
       if (defaults.taxType === "IGST") {
-        worksheet.getRow(bankStartRow + 1).getCell(6).value = `IGST (${taxMeta.igstRate}%):`;
-        worksheet.getRow(bankStartRow + 1).getCell(7).value = igstAmt;
-
-        worksheet.getRow(bankStartRow + 2).getCell(6).value = "GRAND TOTAL:";
-        worksheet.getRow(bankStartRow + 2).getCell(7).value = grandTotal;
+        worksheet.getRow(bankStartRow + 1).getCell(6).value = `IGST (${taxMeta.igstRate}%):`; worksheet.getRow(bankStartRow + 1).getCell(7).value = igstAmt;
+        worksheet.getRow(bankStartRow + 2).getCell(6).value = "GRAND TOTAL:"; worksheet.getRow(bankStartRow + 2).getCell(7).value = grandTotal;
       } else {
-        worksheet.getRow(bankStartRow + 1).getCell(6).value = `CGST (${taxMeta.cgstRate}%):`;
-        worksheet.getRow(bankStartRow + 1).getCell(7).value = cgstAmt;
-
-        worksheet.getRow(bankStartRow + 2).getCell(6).value = `SGST (${taxMeta.sgstRate}%):`;
-        worksheet.getRow(bankStartRow + 2).getCell(7).value = sgstAmt;
-
-        worksheet.getRow(bankStartRow + 3).getCell(6).value = "GRAND TOTAL:";
-        worksheet.getRow(bankStartRow + 3).getCell(7).value = grandTotal;
+        worksheet.getRow(bankStartRow + 1).getCell(6).value = `CGST (${taxMeta.cgstRate}%):`; worksheet.getRow(bankStartRow + 1).getCell(7).value = cgstAmt;
+        worksheet.getRow(bankStartRow + 2).getCell(6).value = `SGST (${taxMeta.sgstRate}%):`; worksheet.getRow(bankStartRow + 2).getCell(7).value = sgstAmt;
+        worksheet.getRow(bankStartRow + 3).getCell(6).value = "GRAND TOTAL:"; worksheet.getRow(bankStartRow + 3).getCell(7).value = grandTotal;
       }
 
       for (let r = bankStartRow; r <= bankStartRow + 3; r++) {
-        worksheet.getCell(`F${r}`).font = { bold: true };
-        worksheet.getCell(`G${r}`).font = { bold: true };
-        worksheet.getCell(`F${r}`).border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
-        worksheet.getCell(`G${r}`).border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
+        ["F", "G"].forEach(col => {
+          worksheet.getCell(`${col}${r}`).font = { bold: true };
+          worksheet.getCell(`${col}${r}`).border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+        });
       }
-
       const rightGrandRow = defaults.taxType === "IGST" ? bankStartRow + 2 : bankStartRow + 3;
-
-      worksheet.getCell(`F${rightGrandRow}`).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF1A3A6B" },
-      };
-
-      worksheet.getCell(`G${rightGrandRow}`).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF1A3A6B" },
-      };
-
-      worksheet.getCell(`F${rightGrandRow}`).font = {
-        bold: true,
-        color: { argb: "FFFFFFFF" },
-      };
-
-      worksheet.getCell(`G${rightGrandRow}`).font = {
-        bold: true,
-        color: { argb: "FFFFFFFF" },
-      };
+      ["F", "G"].forEach(col => {
+        worksheet.getCell(`${col}${rightGrandRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A3A6B" } };
+        worksheet.getCell(`${col}${rightGrandRow}`).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      });
 
       const footerRow = bankStartRow + 8;
-
       worksheet.mergeCells(`A${footerRow}:D${footerRow}`);
-      worksheet.getCell(`A${footerRow}`).value =
-        footerMeta.reverseCharge || "Whether TAX is payable under Reverse Charge - No";
-
+      worksheet.getCell(`A${footerRow}`).value = footerMeta.reverseCharge || "Whether TAX is payable under Reverse Charge - No";
       worksheet.mergeCells(`F${footerRow}:G${footerRow}`);
-      worksheet.getCell(`F${footerRow}`).value =
-        footerMeta.signatureText || "Authorized Signature";
+      worksheet.getCell(`F${footerRow}`).value = footerMeta.signatureText || "Authorized Signature";
       worksheet.getCell(`F${footerRow}`).alignment = { horizontal: "center" };
-
       worksheet.mergeCells(`F${footerRow + 3}:G${footerRow + 3}`);
-      worksheet.getCell(`F${footerRow + 3}`).value =
-        footerMeta.signatureName || "Bhart Sharma";
+      worksheet.getCell(`F${footerRow + 3}`).value = footerMeta.signatureName || "Bhart Sharma";
       worksheet.getCell(`F${footerRow + 3}`).font = { bold: true };
       worksheet.getCell(`F${footerRow + 3}`).alignment = { horizontal: "center" };
 
-      worksheet.getColumn(1).width = 8;
-      worksheet.getColumn(2).width = 25;
-      worksheet.getColumn(3).width = 30;
-      worksheet.getColumn(4).width = 20;
-      worksheet.getColumn(5).width = 20;
+      worksheet.getColumn(1).width = 8; worksheet.getColumn(2).width = 25;
+      worksheet.getColumn(3).width = 30; worksheet.getColumn(4).width = 20; worksheet.getColumn(5).width = 20;
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `Invoice_${invoiceMeta.invoiceNo || "Export"}.xlsx`;
-      anchor.click();
+      anchor.href = url; anchor.download = `Invoice_${invoiceMeta.invoiceNo || "Export"}.xlsx`; anchor.click();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("ExcelJS Export Error:", err);
-      alert("Failed to export Excel with Logo: " + err.message);
-    }
+    } catch (err) { console.error("ExcelJS Export Error:", err); alert("Failed to export Excel with Logo: " + err.message); }
   }
-
-  const editableStyle = {
-    border: "none", background: "transparent", width: "100%", fontSize: "inherit",
-    fontFamily: "inherit", padding: 0, outline: "none", color: "inherit",
-    resize: "none", overflow: "hidden",
-  };
 
   const colsToShow = useMemo(() => {
     const base = colOrder.filter(c => c !== "srNo" && !hiddenCols.includes(c));
-    if (isBulk && !base.includes("invoiceNo") && !hiddenCols.includes("invoiceNo")) {
-      return ["invoiceNo", ...base];
-    }
+    if (isBulk && !base.includes("invoiceNo") && !hiddenCols.includes("invoiceNo")) return ["invoiceNo", ...base];
     return base;
   }, [colOrder, isBulk, hiddenCols]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", display: "flex", alignItems: "stretch", justifyContent: "stretch", padding: 0, overflow: "hidden" }}>
-      <div style={{ background: "#fff", borderRadius: 0, width: "100vw", height: "100vh", maxWidth: "none", boxShadow: "none", overflow: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", display: "flex", alignItems: "stretch" }}>
+      <div style={{ background: "#fff", width: "100vw", height: "100vh", overflow: "auto" }}>
+        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "linear-gradient(135deg, #1e3a5f, #1a365d)", color: "#fff" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Icon type="invoice" size={20} />
@@ -4075,10 +3610,7 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
               </span>
             )}
             <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setShowColPicker(!showColPicker)}
-                style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s" }}
-              >
+              <button onClick={() => setShowColPicker(!showColPicker)} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                 <Icon type="filter" size={14} /> Columns
               </button>
               {showColPicker && (
@@ -4088,16 +3620,14 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
                     {defaults.columns.filter(c => c !== "srNo").map(col => {
                       const idx = defaults.columns.indexOf(col);
                       const label = col === "invoiceNo" ? "Invoice No" : (defaults.colLabels[idx] || col);
-                      const isHidden = hiddenCols.includes(col);
                       return (
                         <div key={col} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#374151", cursor: "pointer", flex: 1 }}>
-                            <input type="checkbox" checked={!isHidden} onChange={() => toggleCol(col)} />
-                            {label}
+                            <input type="checkbox" checked={!hiddenCols.includes(col)} onChange={() => toggleCol(col)} />{label}
                           </label>
                           <div style={{ display: "flex", gap: 4 }}>
-                            <button onClick={() => moveCol(col, "left")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569", fontWeight: "bold" }}>←</button>
-                            <button onClick={() => moveCol(col, "right")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569", fontWeight: "bold" }}>→</button>
+                            <button onClick={() => moveCol(col, "left")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569" }}>←</button>
+                            <button onClick={() => moveCol(col, "right")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569" }}>→</button>
                           </div>
                         </div>
                       );
@@ -4105,13 +3635,12 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
                     {customCols.map(col => (
                       <div key={col} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#2563eb", cursor: "pointer", fontWeight: 600, flex: 1 }}>
-                          <input type="checkbox" checked={!hiddenCols.includes(col)} onChange={() => toggleCol(col)} />
-                          {col}
+                          <input type="checkbox" checked={!hiddenCols.includes(col)} onChange={() => toggleCol(col)} />{col}
                         </label>
                         <div style={{ display: "flex", gap: 4 }}>
-                          <button onClick={() => moveCol(col, "left")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569", fontWeight: "bold" }}>←</button>
-                          <button onClick={() => moveCol(col, "right")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569", fontWeight: "bold" }}>→</button>
-                          <button onClick={() => removeCustomCol(col)} style={{ padding: "2px 6px", fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }}>×</button>
+                          <button onClick={() => moveCol(col, "left")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569" }}>←</button>
+                          <button onClick={() => moveCol(col, "right")} style={{ padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, color: "#475569" }}>→</button>
+                          <button onClick={() => removeCustomCol(col)} style={{ padding: "2px 6px", fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer" }}>×</button>
                         </div>
                       </div>
                     ))}
@@ -4119,39 +3648,29 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e2e8f0" }}>
                     <p style={{ margin: "0 0 8px 0", fontSize: 11, fontWeight: 700, color: "#64748b" }}>Add New Column</p>
                     <div style={{ display: "flex", gap: 6 }}>
-                      <input
-                        value={newColName}
-                        onChange={e => setNewColName(e.target.value)}
-                        placeholder="Column name..."
-                        style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 6, color: "#1e293b", background: "#fff" }}
-                      />
-                      <button
-                        onClick={addCustomCol}
-                        style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
-                      >
-                        Add
-                      </button>
+                      <input value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="Column name..." style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 6, color: "#1e293b" }} />
+                      <button onClick={addCustomCol} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Add</button>
                     </div>
                   </div>
                 </div>
               )}
             </div>
             {existingInvoice ? (
-              <button onClick={handleUpdate} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f59e0b", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13, opacity: saving ? 0.6 : 1, transition: "all 0.2s" }}>
+              <button onClick={handleUpdate} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f59e0b", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>
                 {saving ? "Updating..." : <><Icon type="bulkInvoice" size={15} /> Update Invoice</>}
               </button>
             ) : (
-              <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, background: "#10b981", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13, opacity: saving ? 0.6 : 1, transition: "all 0.2s" }}>
+              <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, background: "#10b981", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>
                 {saving ? "Saving..." : <><Icon type="bulkInvoice" size={15} /> Save Invoice</>}
               </button>
             )}
-            <button onClick={handlePrint} style={{ display: "flex", alignItems: "center", gap: 6, background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13, transition: "all 0.2s" }}>
+            <button onClick={handlePrint} style={{ display: "flex", alignItems: "center", gap: 6, background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>
               <Icon type="print" size={15} /> Print
             </button>
-            <button onClick={handleExportExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13, transition: "all 0.2s" }}>
+            <button onClick={handleExportExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>
               <Icon type="excel" size={15} /> Excel
             </button>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer", transition: "all 0.2s" }}>
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer" }}>
               <Icon type="close" size={16} />
             </button>
           </div>
@@ -4162,164 +3681,121 @@ function InvoiceModal({ cases, onClose, isBulk, existingInvoice }) {
             <div className="logo-area" style={{ width: "100%", marginBottom: "15px", borderBottom: "1px solid #1a3a6b", paddingBottom: "5px" }}>
               <img src="/logo.png?t=1" alt="UNIQUE ENGINEERING AND ASSOCIATE" style={{ width: "100%", height: "auto", display: "block" }} />
             </div>
-
-            <div style={{ textAlign: "center", fontSize: 14, fontWeight: 700, textDecoration: "underline", marginBottom: 10 }}>
-              <input value={invoiceTitle} onChange={e => setInvoiceTitle(e.target.value)} style={{ ...editableStyle, textAlign: "center", fontSize: 14, fontWeight: 700, textDecoration: "underline" }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "flex-start" }}>
-              <div style={{ flex: 1 }}></div>
-              <div style={{ textAlign: "left", fontSize: 11, border: "1px solid #e2e8f0", padding: "10px 14px", borderRadius: 10, background: "#f8fafc" }}>
-                <div style={{ marginBottom: 4 }}><b>Invoice Date:</b> <input value={invoiceMeta.invoiceDate} onChange={e => updateMeta("invoiceDate", e.target.value)} style={{ ...editableStyle, display: "inline", width: 100, marginLeft: 5 }} /></div>
-                <div style={{ marginBottom: 4 }}><b>Invoice No:</b> <input value={invoiceMeta.invoiceNo} onChange={e => updateMeta("invoiceNo", e.target.value)} style={{ ...editableStyle, display: "inline", width: 120, fontWeight: 600, color: "#1a3a6b", marginLeft: 13 }} /></div>
-                <div><b>Bill Month:</b> <input value={invoiceMeta.billMonth} onChange={e => updateMeta("billMonth", e.target.value)} style={{ ...editableStyle, display: "inline", width: 80, marginLeft: 15 }} /></div>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20, fontSize: 11 }}>
-              <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                <div style={{ fontWeight: 800, color: "#1e293b", borderBottom: "2px solid #e2e8f0", paddingBottom: 10, marginBottom: 14, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 4, height: 18, background: "#2563eb", borderRadius: 2 }}></div>
-                  <input value={sectionTitles.receiverTitle} onChange={e => setSectionTitles(prev => ({ ...prev, receiverTitle: e.target.value }))} style={{ ...editableStyle, fontWeight: 800, color: "#1e293b", border: "1px solid transparent" }} />
-                </div>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>Name:</b> <input value={invoiceMeta.receiverName} onChange={e => updateMeta("receiverName", e.target.value)} style={{ ...editableStyle, flex: 1, fontWeight: 600, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "start" }}><b style={{ color: "#475569", width: 75, flexShrink: 0, marginTop: 8 }}>Address:</b> <textarea value={invoiceMeta.receiverAddress} onChange={e => updateMeta("receiverAddress", e.target.value)} rows={2} style={{ ...editableStyle, flex: 1, lineHeight: "1.5", border: "1px solid #e2e8f0", padding: "8px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>GSTIN:</b> <input value={invoiceMeta.receiverGSTIN} onChange={e => updateMeta("receiverGSTIN", e.target.value)} style={{ ...editableStyle, flex: 1, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>SAC Code:</b> <input value={invoiceMeta.sacCode} onChange={e => updateMeta("sacCode", e.target.value)} style={{ ...editableStyle, flex: 1, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                </div>
-              </div>
-              <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                <div style={{ fontWeight: 800, color: "#1e293b", borderBottom: "2px solid #e2e8f0", paddingBottom: 10, marginBottom: 14, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 4, height: 18, background: "#2563eb", borderRadius: 2 }}></div>
-                  <input value={sectionTitles.vendorTitle} onChange={e => setSectionTitles(prev => ({ ...prev, vendorTitle: e.target.value }))} style={{ ...editableStyle, fontWeight: 800, color: "#1e293b", border: "1px solid transparent" }} />
-                </div>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>Name:</b> <input value={vendorMeta.name} onChange={e => updateVendor("name", e.target.value)} style={{ ...editableStyle, flex: 1, fontWeight: 600, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "start" }}><b style={{ color: "#475569", width: 75, flexShrink: 0, marginTop: 8 }}>Address:</b> <textarea value={vendorMeta.address} onChange={e => updateVendor("address", e.target.value)} rows={2} style={{ ...editableStyle, flex: 1, lineHeight: "1.5", border: "1px solid #e2e8f0", padding: "8px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>GSTIN:</b> <input value={vendorMeta.gstin} onChange={e => updateVendor("gstin", e.target.value)} style={{ ...editableStyle, flex: 1, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>PAN:</b> <input value={vendorMeta.pan} onChange={e => updateVendor("pan", e.target.value)} style={{ ...editableStyle, flex: 1, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                  <div style={{ display: "flex", alignItems: "center" }}><b style={{ color: "#475569", width: 75, flexShrink: 0 }}>State:</b> <input value={vendorMeta.state} onChange={e => updateVendor("state", e.target.value)} style={{ ...editableStyle, flex: 1, border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 6, background: "#f8fafc" }} /> <span style={{ color: "#cbd5e1", margin: "0 6px" }}>|</span> <b style={{ color: "#475569" }}>Code:</b> <input value={vendorMeta.stateCode} onChange={e => updateVendor("stateCode", e.target.value)} style={{ ...editableStyle, width: 40, border: "1px solid #e2e8f0", padding: "6px 6px", borderRadius: 6, background: "#f8fafc" }} /></div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontStyle: "italic", color: "#64748b" }}>
-                <input value={descriptionText} onChange={e => setDescriptionText(e.target.value)} style={{ ...editableStyle, fontSize: 11, fontStyle: "italic", color: "#64748b" }} />
-              </div>
-              <button
-                onClick={addRow}
-                className="no-print"
-                style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-              >
-                + Add Row
-              </button>
-            </div>
-
-            <div style={{ overflowX: "auto", marginBottom: 12, borderRadius: 10, border: "1px solid #e2e8f0" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-                <thead>
-                  <tr style={{ background: "#1e293b" }}>
-                    <th style={{ color: "#fff", padding: "8px 10px", textAlign: "left", whiteSpace: "nowrap", border: "none", fontWeight: 600, fontSize: 10 }}>#</th>
-                    {colsToShow.map(col => {
-                      const idx = defaults.columns.indexOf(col);
-                      return (
-                        <th key={col} style={{ color: "#fff", padding: "8px 10px", textAlign: "left", whiteSpace: "nowrap", border: "none", fontWeight: 600, fontSize: 10, minWidth: col.includes("Address") || col.includes("address") ? 180 : undefined }}>
-                          {col === "invoiceNo" ? "Invoice No" : (defaults.colLabels[idx] || col)}
-                        </th>
-                      );
-                    })}
-                    <th className="no-print" style={{ color: "#fff", padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap", border: "none", fontWeight: 600, fontSize: 10, width: 70 }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, ri) => (
-                    <tr key={ri} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", transition: "background 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                      onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? "#fff" : "#f8fafc"}>
-                      <td style={{ border: "0.5px solid #e2e8f0", padding: "6px 10px", color: "#64748b", fontSize: 10 }}>{ri + 1}</td>
-                      {colsToShow.map(col => (
-                        <td key={col} style={{ border: "0.5px solid #e2e8f0", padding: "6px 10px" }}>
-                          <textarea
-                            value={row[col] || ""}
-                            onChange={e => updateCell(ri, col, e.target.value)}
-                            rows={1}
-                            style={{ ...editableStyle, minWidth: col.includes("Address") || col.includes("address") ? 170 : 70, fontSize: 10 }}
-                            onInput={e => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-                          />
-                        </td>
-                      ))}
-                      <td className="no-print" style={{ border: "0.5px solid #e2e8f0", padding: "6px 10px", textAlign: "center" }}>
-                        <button
-                          onClick={() => deleteRow(ri)}
-                          className="no-print"
-                          style={{
-                            background: "#ef4444",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 6,
-                            padding: "5px 10px",
-                            cursor: "pointer",
-                            fontSize: 10,
-                            fontWeight: 500,
-                            transition: "all 0.2s"
-                          }}
-                          onMouseOver={e => e.target.style.background = "#dc2626"}
-                          onMouseOut={e => e.target.style.background = "#ef4444"}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 20, alignItems: "start" }}>
-              <div style={{ border: "1px solid #e2e8f0", padding: 14, fontSize: 10, borderRadius: 10, background: "#f8fafc" }}>
-                <div style={{ fontWeight: 700, marginBottom: 6, color: "#1e293b", fontSize: 11 }}>
-                  <input value={sectionTitles.bankTitle} onChange={e => setSectionTitles(prev => ({ ...prev, bankTitle: e.target.value }))} style={{ ...editableStyle, fontWeight: 700, fontSize: 11, color: "#1e293b" }} />
-                </div>
-                <div style={{ marginBottom: 4 }}><b style={{ color: "#475569" }}>Customer Name:</b> <input value={bankMeta.customerName} onChange={e => updateBank("customerName", e.target.value)} style={{ ...editableStyle, display: "inline", width: "65%", color: "#1e293b" }} /></div>
-                <div style={{ marginBottom: 4 }}><b style={{ color: "#475569" }}>Bank Name:</b> <input value={bankMeta.bankName} onChange={e => updateBank("bankName", e.target.value)} style={{ ...editableStyle, display: "inline", width: "65%", color: "#1e293b" }} /></div>
-                <div style={{ marginBottom: 4 }}><b style={{ color: "#475569" }}>Account No.:</b> <input value={bankMeta.accountNo} onChange={e => updateBank("accountNo", e.target.value)} style={{ ...editableStyle, display: "inline", width: 120, color: "#1e293b" }} /></div>
-                <div style={{ marginBottom: 4 }}><b style={{ color: "#475569" }}>Branch Address:</b> <textarea value={bankMeta.branchAddress} onChange={e => updateBank("branchAddress", e.target.value)} rows={2} style={{ ...editableStyle, marginTop: 2, color: "#1e293b" }} /></div>
-                <div style={{ marginBottom: 4 }}><b style={{ color: "#475569" }}>IFSC Code:</b> <input value={bankMeta.ifscCode} onChange={e => updateBank("ifscCode", e.target.value)} style={{ ...editableStyle, display: "inline", width: 100, color: "#1e293b" }} /></div>
-                <div><b style={{ color: "#475569" }}>PAN Number:</b> <input value={bankMeta.panNumber} onChange={e => updateBank("panNumber", e.target.value)} style={{ ...editableStyle, display: "inline", width: 100, color: "#1e293b" }} /></div>
-              </div>
-              <div style={{ border: "1px solid #e2e8f0", minWidth: 280, fontSize: 11, borderRadius: 10, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <tbody>
-                    <tr><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", fontWeight: 600, color: "#475569", background: "#f8fafc" }}>SUB TOTAL</td><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", textAlign: "right", fontWeight: 600, color: "#1e293b", background: "#f8fafc" }}>₹ <input value={(editableSubTotal !== null ? editableSubTotal : calculatedSubTotal).toFixed(2)} onChange={e => { const val = e.target.value; setEditableSubTotal(val === '' ? null : parseFloat(val) || 0); }} style={{ ...editableStyle, display: "inline", width: 80, textAlign: "right", fontWeight: 600, color: "#1e293b" }} /></td></tr>
-                    {defaults.taxType === "IGST" ? (
-                      <tr><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", color: "#475569" }}>IGST @ <input value={taxMeta.igstRate} onChange={e => updateTax("igstRate", parseFloat(e.target.value) || 0)} style={{ ...editableStyle, display: "inline", width: 30, textAlign: "center", color: "#1e293b" }} />%</td><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", textAlign: "right", color: "#1e293b" }}>₹ {igstAmt.toFixed(2)}</td></tr>
-                    ) : (
-                      <>
-                        <tr><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", color: "#475569" }}>CGST @ <input value={taxMeta.cgstRate} onChange={e => updateTax("cgstRate", parseFloat(e.target.value) || 0)} style={{ ...editableStyle, display: "inline", width: 30, textAlign: "center", color: "#1e293b" }} />%</td><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", textAlign: "right", color: "#1e293b" }}>₹ {cgstAmt.toFixed(2)}</td></tr>
-                        <tr><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", color: "#475569" }}>SGST @ <input value={taxMeta.sgstRate} onChange={e => updateTax("sgstRate", parseFloat(e.target.value) || 0)} style={{ ...editableStyle, display: "inline", width: 30, textAlign: "center", color: "#1e293b" }} />%</td><td style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", textAlign: "right", color: "#1e293b" }}>₹ {sgstAmt.toFixed(2)}</td></tr>
-                      </>
-                    )}
-                    <tr style={{ background: "#1e293b", color: "#fff" }}><td style={{ padding: "10px 12px", fontWeight: 700, fontSize: 12 }}>GRAND TOTAL</td><td style={{ padding: "10px 12px", fontWeight: 700, textAlign: "right", fontSize: 12 }}>₹ {grandTotal.toFixed(2)}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 24, textAlign: "right", fontSize: 11 }}>
-              <div>
-                <input value={footerMeta.signatureText} onChange={e => updateFooter("signatureText", e.target.value)} style={{ ...editableStyle, textAlign: "right", fontSize: 11, color: "#475569" }} />
-              </div>
-              <div style={{ marginTop: 36, borderTop: "2px solid #334155", width: 200, display: "inline-block", paddingTop: 6 }}>
-                <input value={footerMeta.signatureName} onChange={e => updateFooter("signatureName", e.target.value)} style={{ ...editableStyle, textAlign: "center", fontSize: 11, color: "#1e293b", fontWeight: 600 }} />
-              </div>
-            </div>
-            <div style={{ marginTop: 10, fontSize: 10, color: "#64748b" }}>
-              <input value={footerMeta.reverseCharge} onChange={e => updateFooter("reverseCharge", e.target.value)} style={{ ...editableStyle, fontSize: 10, color: "#64748b" }} />
-            </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── SHARED FILTER BAR COMPONENT ───────────────────────────────────────────────
+// Reused on both Dashboard and Invoice tabs
+function FilterBar({
+  search, setSearch,
+  bankFilter, setBankFilter,
+  statusFilter, setStatusFilter,
+  cityFilter, setCityFilter,
+  monthFilter, setMonthFilter,
+  yearFilter, setYearFilter,
+  backMonth, setBackMonth,
+  fromDate, setFromDate,
+  toDate, setToDate,
+  banks, cities,
+  hasFilters, clearFilters,
+  backMonthOptions,
+  setPage,
+}) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+      {/* Search */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 16px", minWidth: 220, flex: "1 1 220px" }}>
+        <Icon type="search" size={16} />
+        <input
+          value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Search customer name…"
+          style={{ background: "none", border: "none", outline: "none", fontSize: 13, color: "#0f172a", width: "100%", fontFamily: "inherit" }}
+        />
+        {search && (
+          <button onClick={() => { setSearch(""); setPage(1); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 0, display: "flex" }}>
+            <Icon type="close" size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Bank filter */}
+      <MultiSelect
+        options={banks.filter(b => b !== "All").map(b => ({ value: b, label: b }))}
+        selectedValues={bankFilter}
+        onChange={(v) => { setBankFilter(v); setPage(1); }}
+        placeholder="Bank: All"
+      />
+
+      {/* Status filter */}
+      <MultiSelect
+        options={["Pending", "Work in Progress", "FinalSubmitted", "Query Raised", "Cancelled"].map(s => ({ value: s, label: s }))}
+        selectedValues={statusFilter}
+        onChange={(v) => { setStatusFilter(v); setPage(1); }}
+        placeholder="Status: All"
+      />
+
+      {/* City filter */}
+      <MultiSelect
+        options={cities.map(c => ({ value: c, label: c }))}
+        selectedValues={cityFilter}
+        onChange={(v) => { setCityFilter(v); setPage(1); }}
+        placeholder="City: All"
+      />
+
+      {/* Month filter — FIX: value is number (0-11) */}
+      <MultiSelect
+        options={MONTH_OPTIONS.map(m => ({ value: m.value, label: m.label }))}
+        selectedValues={monthFilter}
+        onChange={(v) => { setMonthFilter(v); setPage(1); }}
+        placeholder="Month: All"
+      />
+
+      {/* Year filter */}
+      <MultiSelect
+        options={Array.from({ length: 5 }, (_, i) => 2024 + i).map(y => ({ value: y, label: String(y) }))}
+        selectedValues={yearFilter}
+        onChange={(v) => { setYearFilter(v); setPage(1); }}
+        placeholder="Year: All"
+      />
+
+      {/* Back Month */}
+      <div style={{ minWidth: 220 }}>
+        <select
+          value={backMonth || ""}
+          onChange={e => { setBackMonth(e.target.value || null); setPage(1); }}
+          style={{
+            width: "100%", padding: "8px 12px", border: "1px solid #e2e8f0", borderRadius: "8px",
+            background: backMonth ? "#eff6ff" : "#fff", color: backMonth ? "#1e40af" : "#64748b",
+            cursor: "pointer", fontSize: "13px", fontFamily: "inherit"
+          }}
+        >
+          <option value="">Back Month (None)</option>
+          {backMonthOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Date range */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Visit date:</span>
+        <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1); }}
+          style={{ fontSize: 12, borderRadius: 8, padding: "9px 12px", border: "1px solid #e2e8f0", background: "#fff", color: "#0f172a", cursor: "pointer", fontFamily: "inherit" }} />
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>to</span>
+        <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(1); }}
+          style={{ fontSize: 12, borderRadius: 8, padding: "9px 12px", border: "1px solid #e2e8f0", background: "#fff", color: "#0f172a", cursor: "pointer", fontFamily: "inherit" }} />
+      </div>
+
+      {/* Clear */}
+      {hasFilters && (
+        <button onClick={clearFilters} style={{ fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+          Clear filters
+        </button>
+      )}
     </div>
   );
 }
@@ -4335,14 +3811,20 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const isMobile = useMediaQuery("(max-width: 1024px)");
 
+  // ── All filter state lives here (shared between both tabs) ──────────────────
   const [search, setSearch] = useState("");
   const [bankFilter, setBankFilter] = useState([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  // FIX: monthFilter stores numbers (0-11), not strings
   const [monthFilter, setMonthFilter] = useState([]);
+  // FIX: yearFilter stores numbers, not strings
   const [yearFilter, setYearFilter] = useState([]);
   const [statusFilter, setStatusFilter] = useState([]);
+  const [cityFilter, setCityFilter] = useState([]);
+  const [backMonth, setBackMonth] = useState(null);
   const [page, setPage] = useState(1);
+
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [invoiceModal, setInvoiceModal] = useState(null);
   const [savedInvoices, setSavedInvoices] = useState([]);
@@ -4352,30 +3834,18 @@ export default function App() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
-    if (token && user) {
-      setIsLoggedIn(true);
-    }
+    if (token && user) setIsLoggedIn(true);
   }, []);
 
   const handleLogin = async (username, password) => {
-    setLoginLoading(true);
-    setLoginError("");
+    setLoginLoading(true); setLoginError("");
     const result = await loginService(username, password);
     setLoginLoading(false);
-
-    if (result.success) {
-      setIsLoggedIn(true);
-      return true;
-    } else {
-      setLoginError(result.message);
-      return false;
-    }
+    if (result.success) { setIsLoggedIn(true); return true; }
+    else { setLoginError(result.message); return false; }
   };
 
-  const handleLogout = async () => {
-    await logoutService();
-    setIsLoggedIn(false);
-  };
+  const handleLogout = async () => { await logoutService(); setIsLoggedIn(false); };
 
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
@@ -4384,7 +3854,6 @@ export default function App() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-
     setLoading(true);
     fetch(API_URL, { credentials: "include" })
       .then(r => r.json())
@@ -4402,14 +3871,9 @@ export default function App() {
       .catch(e => { setError("Could not connect to API: " + e.message); setLoading(false); });
 
     setLoadingInvoices(true);
-    fetch(`${URL}/api/invoices`, {
-      headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` },
-      credentials: "include"
-    })
+    fetch(`${URL}/api/invoices`, { headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }, credentials: "include" })
       .then(r => r.json())
-      .then(data => {
-        if (data.success) setSavedInvoices(data.data);
-      })
+      .then(data => { if (data.success) setSavedInvoices(data.data); })
       .catch(e => console.error("Error fetching invoices:", e))
       .finally(() => setLoadingInvoices(false));
   }, [isLoggedIn, activeTab]);
@@ -4417,6 +3881,11 @@ export default function App() {
   const banks = useMemo(() => {
     const s = new Set(cases.map(c => c.bankName).filter(Boolean));
     return ["All", ...Array.from(s).sort()];
+  }, [cases]);
+
+  const cities = useMemo(() => {
+    const s = new Set(cases.map(c => c.city).filter(city => city && city !== "N/A" && city !== "—"));
+    return [...Array.from(s).sort()];
   }, [cases]);
 
   const stats = useMemo(() => ({
@@ -4427,108 +3896,198 @@ export default function App() {
     cancelled: cases.filter(c => c.status === "cancelled").length,
   }), [cases]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, bankFilter, fromDate, toDate, monthFilter, yearFilter, statusFilter]);
-
-  const filtered = useMemo(() => {
-    return cases.filter(c => {
-      if (bankFilter.length > 0 && !bankFilter.includes(c.bankName)) return false;
-
-      const q = search.toLowerCase();
-      if (q && !c.customerName.toLowerCase().includes(q) && !c.bankName.toLowerCase().includes(q) && !c.refNo.toLowerCase().includes(q)) return false;
-
-      const dCreated = parseDate(c.createdDateRaw);
-      const dVisit = parseDate(c.visitDateRaw);
-
-      if (monthFilter.length > 0) {
-        if (!dCreated) return false;
-        if (!monthFilter.includes(dCreated.getMonth())) return false;
-      }
-
-      if (yearFilter.length > 0) {
-        if (!dCreated) return false;
-        if (!yearFilter.includes(dCreated.getFullYear())) return false;
-      }
-
-      if (statusFilter.length > 0) {
-        if (!c.status) return false;
-        if (!statusFilter.includes(c.status)) return false;
-      }
-
-      if (fromDate || toDate) {
-        if (!dVisit) return false;
-        if (fromDate && dVisit < new Date(fromDate)) return false;
-        if (toDate) { const to = new Date(toDate); to.setHours(23, 59, 59); if (dVisit > to) return false; }
-      }
-      return true;
+  // Back month options
+  const backMonthOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return MONTH_OPTIONS.map((month, index) => {
+      const prevIndex = index === 0 ? 11 : index - 1;
+      const backM = MONTH_OPTIONS[prevIndex];
+      const backYear = index === 0 ? currentYear - 1 : currentYear;
+      return {
+        label: `${month.label} (shows ${backM.label} ${backYear})`,
+        value: month.label,   // keep string key for select
+        backValue: backM.label,
+        backYear,
+      };
     });
-  }, [cases, search, bankFilter, fromDate, toDate, monthFilter, yearFilter, statusFilter]);
+  }, []);
+
+  useEffect(() => { setPage(1); }, [search, bankFilter, fromDate, toDate, monthFilter, yearFilter, statusFilter, cityFilter, backMonth]);
+
+  // ── FIXED FILTER LOGIC ───────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let data = cases;
+
+    if (bankFilter.length > 0) data = data.filter(c => bankFilter.includes(c.bankName));
+
+    const q = search.toLowerCase();
+    if (q) data = data.filter(c => c.customerName.toLowerCase().includes(q) || c.bankName.toLowerCase().includes(q) || c.refNo.toLowerCase().includes(q));
+
+    // FIX: monthFilter stores numbers (0-11), d.getMonth() also returns 0-11 ✓
+    if (monthFilter.length > 0) {
+      data = data.filter(c => {
+        const d = parseDate(c.createdDateRaw);
+        if (!d) return false;
+        return monthFilter.includes(d.getMonth()); // both are numbers now
+      });
+    }
+
+    // FIX: yearFilter stores numbers, d.getFullYear() returns number ✓
+    if (yearFilter.length > 0) {
+      data = data.filter(c => {
+        const d = parseDate(c.createdDateRaw);
+        if (!d) return false;
+        return yearFilter.includes(d.getFullYear()); // both are numbers now
+      });
+    }
+
+    if (statusFilter.length > 0) data = data.filter(c => statusFilter.includes(c.status));
+
+    if (cityFilter.length > 0) data = data.filter(c => cityFilter.includes(c.city));
+
+    if (backMonth) {
+      const selectedBackMonthOption = backMonthOptions.find(opt => opt.value === backMonth);
+      if (selectedBackMonthOption) {
+        data = data.filter(c => {
+          if (!c.createdDateRaw) return false;
+          const d = new Date(c.createdDateRaw);
+          if (isNaN(d.getTime())) return false;
+          const recordMonth = d.toLocaleString("en-US", { month: "long" });
+          const recordYear = d.getFullYear();
+          return recordMonth === selectedBackMonthOption.backValue && recordYear === selectedBackMonthOption.backYear;
+        });
+      }
+    }
+
+    if (fromDate || toDate) {
+      data = data.filter(c => {
+        const d = parseDate(c.visitDateRaw);
+        if (!d) return false;
+        if (fromDate && d < new Date(fromDate)) return false;
+        if (toDate) { const to = new Date(toDate); to.setHours(23, 59, 59); if (d > to) return false; }
+        return true;
+      });
+    }
+
+    return data;
+  }, [cases, search, bankFilter, fromDate, toDate, monthFilter, yearFilter, statusFilter, cityFilter, backMonth, backMonthOptions]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const clearFilters = () => { setSearch(""); setBankFilter([]); setFromDate(""); setToDate(""); setMonthFilter([]); setYearFilter([]); setStatusFilter([]); setPage(1); };
-  const hasFilters = search || bankFilter.length > 0 || fromDate || toDate || monthFilter.length > 0 || yearFilter.length > 0 || statusFilter.length > 0;
+
+  const clearFilters = () => {
+    setSearch(""); setBankFilter([]); setFromDate(""); setToDate("");
+    setMonthFilter([]); setYearFilter([]); setStatusFilter([]); setCityFilter([]);
+    setBackMonth(null); setPage(1);
+  };
+  const hasFilters = !!(search || bankFilter.length > 0 || fromDate || toDate || monthFilter.length > 0 || yearFilter.length > 0 || statusFilter.length > 0 || cityFilter.length > 0 || backMonth);
+
+  // ── Saved Invoices filters for Dashboard table ─────────────────────────────
+  const parseInvoiceDate = (raw) => {
+    if (!raw) return null;
+    if (raw instanceof Date) return isNaN(raw) ? null : raw;
+    const str = String(raw).trim();
+    let d = new Date(str);
+    if (!isNaN(d)) return d;
+    const m = str.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})$/);
+    if (m) {
+      const day = Number(m[1]);
+      const month = Number(m[2]) - 1;
+      let year = Number(m[3]);
+      if (year < 100) year += 2000;
+      d = new Date(year, month, day);
+      return isNaN(d) ? null : d;
+    }
+    return null;
+  };
+
+  const filteredSavedInvoices = useMemo(() => {
+    let data = [...savedInvoices];
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      data = data.filter(inv =>
+        String(inv.invoiceNo || "").toLowerCase().includes(q) ||
+        String(inv.bankName || "").toLowerCase().includes(q) ||
+        String(inv.billMonth || "").toLowerCase().includes(q) ||
+        String(inv.status || "Submitted").toLowerCase().includes(q)
+      );
+    }
+
+    if (bankFilter.length > 0) {
+      data = data.filter(inv => bankFilter.includes(inv.bankName));
+    }
+
+    if (statusFilter.length > 0) {
+      data = data.filter(inv => statusFilter.includes(inv.status || "Submitted"));
+    }
+
+    if (monthFilter.length > 0) {
+      data = data.filter(inv => {
+        const d = parseInvoiceDate(inv.invoiceDate || inv.createdAt);
+        return d && monthFilter.includes(d.getMonth());
+      });
+    }
+
+    if (yearFilter.length > 0) {
+      data = data.filter(inv => {
+        const d = parseInvoiceDate(inv.invoiceDate || inv.createdAt);
+        return d && yearFilter.includes(d.getFullYear());
+      });
+    }
+
+    if (fromDate || toDate) {
+      data = data.filter(inv => {
+        const d = parseInvoiceDate(inv.invoiceDate || inv.createdAt);
+        if (!d) return false;
+        if (fromDate && d < new Date(fromDate)) return false;
+        if (toDate) {
+          const to = new Date(toDate);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
+    }
+
+    return data;
+  }, [savedInvoices, search, bankFilter, statusFilter, monthFilter, yearFilter, fromDate, toDate]);
+
 
   const exportSavedInvoicesToExcel = () => {
     try {
-      if (savedInvoices.length === 0) return alert("No data to export");
-      const data = savedInvoices.map(inv => ({
-        "Invoice No": inv.invoiceNo,
-        "Bank Name": inv.bankName,
-        "Bill Month": inv.billMonth,
-        "Date": formatDate(inv.invoiceDate),
-        "Amount": inv.totalAmount,
-        "Status": inv.status || "Submitted"
+      if (filteredSavedInvoices.length === 0) return alert("No filtered invoice data to export");
+      const data = filteredSavedInvoices.map(inv => ({
+        "Invoice No": inv.invoiceNo, "Bank Name": inv.bankName, "Bill Month": inv.billMonth,
+        "Date": formatDate(inv.invoiceDate), "Amount": inv.totalAmount, "Status": inv.status || "Submitted"
       }));
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Saved Invoices");
       XLSX.writeFile(wb, "Saved_Invoices_List.xlsx");
-    } catch (err) {
-      console.error("Dashboard Excel Export Error:", err);
-    }
+    } catch (err) { console.error("Dashboard Excel Export Error:", err); }
   };
 
   const mainML = !isMobile && sidebarOpen ? 260 : 0;
   const canBulkInvoice = bankFilter.length > 0 && filtered.length > 0;
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} error={loginError} loading={loginLoading} />;
-  }
+  if (!isLoggedIn) return <LoginPage onLogin={handleLogin} error={loginError} loading={loginLoading} />;
 
-  // Stats card config
-  const statCards = [
-    { label: "Total cases", val: stats.total, color: "#3b82f6", bg: "#eff6ff", icon: "grid" },
-    { label: "Pending", val: stats.pending, color: "#f59e0b", bg: "#fef3c7", icon: "bell" },
-    { label: "In progress", val: stats.wip, color: "#8b5cf6", bg: "#ede9fe", icon: "search" },
-    { label: "Submitted", val: stats.submitted, color: "#10b981", bg: "#d1fae5", icon: "invoice" },
-    { label: "Cancelled", val: stats.cancelled, color: "#ef4444", bg: "#fee2e2", icon: "close" },
-  ];
+  // Common filter bar props
+  const filterBarProps = {
+    search, setSearch, bankFilter, setBankFilter, statusFilter, setStatusFilter,
+    cityFilter, setCityFilter, monthFilter, setMonthFilter, yearFilter, setYearFilter,
+    backMonth, setBackMonth, fromDate, setFromDate, toDate, setToDate,
+    banks, cities, hasFilters, clearFilters, backMonthOptions, setPage,
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" }}>
       <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(-10px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes ripple {
-          to { transform: scale(4); opacity: 0; }
-        }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .blink-row { animation: blink 1s ease-in-out infinite; }
         * { box-sizing: border-box; }
         body { margin: 0; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -4541,7 +4100,7 @@ export default function App() {
         <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 20, backdropFilter: "blur(2px)" }} />
       )}
 
-      {/* SIDEBAR - Materially Style */}
+      {/* SIDEBAR */}
       <aside style={{
         position: "fixed", top: 0, left: 0, height: "100%", width: 260, zIndex: 30,
         background: "#fff", borderRight: "1px solid #e2e8f0", display: "flex",
@@ -4549,16 +4108,9 @@ export default function App() {
         transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
         boxShadow: sidebarOpen ? "4px 0 20px rgba(0,0,0,0.05)" : "none"
       }}>
-        {/* Sidebar Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 12,
-              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontWeight: 700, fontSize: 18,
-              boxShadow: "0 4px 12px rgba(37,99,235,0.3)"
-            }}>U</div>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, #3b82f6, #2563eb)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 18, boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>U</div>
             <div>
               <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.5px" }}>UNIQUE</p>
               <p style={{ margin: 0, fontSize: 10, color: "#94a3b8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "1px" }}>Valuation Portal</p>
@@ -4566,99 +4118,37 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sidebar Navigation */}
         <nav style={{ flex: 1, padding: "20px 16px" }}>
           <p style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1.5px", padding: "0 12px 12px", margin: 0 }}>Main Menu</p>
-
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {[
-              { id: "Dashboard", icon: "grid", label: "Dashboard" },
-              { id: "Invoice", icon: "invoice", label: "Invoice" }
-            ].map(item => {
+            {[{ id: "Dashboard", icon: "grid", label: "Dashboard" }, { id: "Invoice", icon: "invoice", label: "Invoice" }].map(item => {
               const isActive = activeTab === item.id;
               const isHovered = sidebarHover === item.id;
-
               return (
-                <button
-                  key={item.id}
+                <button key={item.id}
                   onClick={() => { setActiveTab(item.id); if (isMobile) setSidebarOpen(false); }}
-                  onMouseEnter={() => setSidebarHover(item.id)}
-                  onMouseLeave={() => setSidebarHover(null)}
+                  onMouseEnter={() => setSidebarHover(item.id)} onMouseLeave={() => setSidebarHover(null)}
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "12px 16px",
-                    borderRadius: "12px",
-                    border: "none",
-                    cursor: "pointer",
-                    background: isActive
-                      ? "linear-gradient(135deg, #3b82f6, #2563eb)"
-                      : isHovered ? "#f1f5f9" : "transparent",
-                    color: isActive ? "#fff" : "#475569",
-                    fontSize: 14,
-                    fontWeight: isActive ? 600 : 500,
+                    width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+                    borderRadius: "12px", border: "none", cursor: "pointer",
+                    background: isActive ? "linear-gradient(135deg, #3b82f6, #2563eb)" : isHovered ? "#f1f5f9" : "transparent",
+                    color: isActive ? "#fff" : "#475569", fontSize: 14, fontWeight: isActive ? 600 : 500,
                     transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
-                    position: "relative",
-                    overflow: "hidden",
                     transform: isActive ? "scale(1.02)" : "scale(1)",
                     boxShadow: isActive ? "0 4px 15px rgba(37,99,235,0.3)" : "none",
-                    letterSpacing: "0.2px"
-                  }}
-                >
-                  {/* Ripple effect on click */}
-                  <span style={{
-                    position: "absolute",
-                    borderRadius: "50%",
-                    background: "rgba(255,255,255,0.3)",
-                    width: 20,
-                    height: 20,
-                    opacity: 0,
-                    transform: "scale(0)",
-                    animation: isActive ? "ripple 0.6s ease-out" : "none",
-                    pointerEvents: "none"
-                  }} />
-
-                  <span style={{
-                    transition: "transform 0.2s ease",
-                    transform: isHovered && !isActive ? "scale(1.1)" : "scale(1)"
                   }}>
-                    <Icon type={item.icon} size={18} />
-                  </span>
+                  <Icon type={item.icon} size={18} />
                   <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
-
-                  {isActive && (
-                    <span style={{
-                      width: 6, height: 6, borderRadius: "50%",
-                      background: "#fff", opacity: 0.8,
-                      animation: "pulse 1.5s ease-in-out infinite"
-                    }} />
-                  )}
                 </button>
               );
             })}
           </div>
         </nav>
 
-        {/* Sidebar Footer */}
         <div style={{ padding: "20px", borderTop: "1px solid #f1f5f9" }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 12,
-            padding: "12px", borderRadius: "12px",
-            background: "#f8fafc"
-          }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%",
-              background: "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, fontWeight: 600, color: "#4f46e5"
-            }}>AV</div>
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Admin User</p>
-              <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>Valuer</p>
-            </div>
-          </div>
+          <button onClick={handleLogout} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: "12px", border: "none", cursor: "pointer", background: "#fee2e2", color: "#dc2626", fontSize: 14, fontWeight: 600 }}>
+            <Icon type="close" size={18} /><span>Logout</span>
+          </button>
         </div>
       </aside>
 
@@ -4671,96 +4161,44 @@ export default function App() {
         boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "#64748b", padding: 8, borderRadius: 8,
-              transition: "all 0.2s"
-            }}
-            onMouseEnter={e => { e.target.style.background = "#f1f5f9"; e.target.style.color = "#0f172a"; }}
-            onMouseLeave={e => { e.target.style.background = "none"; e.target.style.color = "#64748b"; }}
-          >
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 8, borderRadius: 8 }}>
             <Icon type="menu" size={20} />
           </button>
-          <div>
-            <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.5px" }}>{activeTab}</p>
-            <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", marginTop: 1 }}>
-              {activeTab === "Dashboard" ? "Overview of your valuation cases" : "Manage case invoices"}
-            </p>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.5px" }}>{activeTab}</p>
+        </div>
+        {/* Show active filter count in header */}
+        {hasFilters && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ background: "#eff6ff", color: "#1e40af", border: "1px solid #bfdbfe", borderRadius: 99, padding: "4px 12px", fontSize: 12, fontWeight: 600 }}>
+              {filtered.length} filtered
+            </span>
+            <button onClick={clearFilters} style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Clear all
+            </button>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "#fee2e2", color: "#dc2626", border: "none",
-              borderRadius: 10, padding: "8px 16px", cursor: "pointer",
-              fontSize: 13, fontWeight: 600, transition: "all 0.2s",
-              letterSpacing: "0.2px"
-            }}
-            onMouseEnter={e => { e.target.style.background = "#fecaca"; }}
-            onMouseLeave={e => { e.target.style.background = "#fee2e2"; }}
-          >
-            Logout
-          </button>
-          <div style={{
-            width: 36, height: 36, borderRadius: "50%",
-            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: 13, fontWeight: 600,
-            boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
-          }}>AV</div>
-        </div>
+        )}
       </header>
 
       {/* MAIN CONTENT */}
-      <main style={{
-        marginLeft: mainML, paddingTop: 68, minHeight: "100vh",
-        transition: "margin-left 0.3s cubic-bezier(0.4,0,0.2,1)",
-        background: "#f1f5f9"
-      }}>
+      <main style={{ marginLeft: mainML, paddingTop: 68, minHeight: "100vh", transition: "margin-left 0.3s cubic-bezier(0.4,0,0.2,1)", background: "#f1f5f9" }}>
         <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
 
-          {/* Breadcrumb */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94a3b8" }}>
-            <span style={{ color: "#3b82f6", cursor: "pointer", fontWeight: 500 }} onClick={() => setActiveTab("Dashboard")}>Home</span>
-            <span style={{ color: "#cbd5e1" }}>/</span>
-            <span style={{ color: "#0f172a", fontWeight: 600 }}>{activeTab}</span>
-          </div>
-
-          {/* DASHBOARD TAB */}
+          {/* ── DASHBOARD TAB ── */}
           {activeTab === "Dashboard" && (
             <>
-              {/* Stats Cards */}
+              {/* STAT CARDS */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }}>
-                {statCards.map((s, idx) => (
-                  <div
-                    key={s.label}
-                    style={{
-                      background: "#fff", borderRadius: "16px", padding: "24px",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)",
-                      border: "1px solid #f1f5f9",
-                      transition: "all 0.25s ease",
-                      animation: `fadeInUp 0.4s ease ${idx * 0.05}s both`,
-                      cursor: "default"
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = "translateY(-4px)";
-                      e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.08)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)";
-                    }}
-                  >
+                {[
+                  { label: "Total cases", val: stats.total, color: "#3b82f6", bg: "#eff6ff", icon: "grid" },
+                  { label: "Pending", val: stats.pending, color: "#f59e0b", bg: "#fef3c7", icon: "bell" },
+                  { label: "In progress", val: stats.wip, color: "#8b5cf6", bg: "#ede9fe", icon: "search" },
+                  { label: "Submitted", val: stats.submitted, color: "#10b981", bg: "#d1fae5", icon: "invoice" },
+                  { label: "Cancelled", val: stats.cancelled, color: "#ef4444", bg: "#fee2e2", icon: "close" },
+                ].map((s, idx) => (
+                  <div key={s.label} style={{ background: "#fff", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #f1f5f9", animation: `fadeInUp 0.4s ease ${idx * 0.05}s both` }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                      <div style={{
-                        width: 44, height: 44, borderRadius: "12px",
-                        background: s.bg, display: "flex", alignItems: "center",
-                        justifyContent: "center"
-                      }}>
-                        <Icon type={s.icon} size={20} color={s.color} />
+                      <div style={{ width: 44, height: 44, borderRadius: "12px", background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon type={s.icon} size={20} />
                       </div>
                     </div>
                     <p style={{ margin: "0 0 4px", fontSize: 12, color: "#94a3b8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.label}</p>
@@ -4769,97 +4207,41 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Saved Invoices Section */}
-              <div style={{
-                background: "#fff", borderRadius: "16px",
-                border: "1px solid #f1f5f9", overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-              }}>
-                <div style={{
-                  padding: "20px 28px", borderBottom: "1px solid #f1f5f9",
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  flexWrap: "wrap", gap: 16
-                }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.3px" }}>Saved Invoices</p>
-                    <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", marginTop: 4 }}>Retrieve and view invoices already saved to the database</p>
+              {/* SAVED INVOICES */}
+              <div style={{ background: "#fff", borderRadius: "16px", border: "1px solid #f1f5f9", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ padding: "20px 28px", borderBottom: "1px solid #f1f5f9" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>Saved Invoices</p>
+                      <p style={{ margin: "6px 0 0", fontSize: 13, color: "#94a3b8" }}>
+                        Retrieve and view invoices already saved to the database
+                      </p>
+                    </div>
+                    {savedInvoices.length > 0 && (
+                      <button onClick={exportSavedInvoicesToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        <Icon type="excel" size={15} /> Export Excel
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={exportSavedInvoicesToExcel}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      background: "#fff", border: "1px solid #e2e8f0",
-                      borderRadius: 10, padding: "10px 18px", fontSize: 13,
-                      fontWeight: 600, cursor: "pointer", color: "#475569",
-                      transition: "all 0.2s"
-                    }}
-                    onMouseEnter={e => { e.target.style.background = "#f8fafc"; e.target.style.borderColor = "#cbd5e1"; }}
-                    onMouseLeave={e => { e.target.style.background = "#fff"; e.target.style.borderColor = "#e2e8f0"; }}
-                  >
-                    <Icon type="excel" size={16} /> Export Excel
-                  </button>
-                </div>
 
-                {/* Dashboard Filters */}
-                <div style={{ padding: "16px 28px", borderBottom: "1px solid #f1f5f9", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
-                  <MultiSelect
-                    options={banks.filter(b => b !== "All").map(b => ({ value: b, label: b }))}
-                    selectedValues={bankFilter}
-                    onChange={setBankFilter}
-                    placeholder="Bank: All"
-                  />
-                  <MultiSelect
-                    options={["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, idx) => ({ value: idx, label: m }))}
-                    selectedValues={monthFilter}
-                    onChange={setMonthFilter}
-                    placeholder="Month: All"
-                  />
-                  <MultiSelect
-                    options={Array.from({ length: 5 }, (_, i) => 2024 + i).map(y => ({ value: y, label: String(y) }))}
-                    selectedValues={yearFilter}
-                    onChange={setYearFilter}
-                    placeholder="Year: All"
-                  />
-                  <MultiSelect
-                    options={["Pending", "Work in Progress", "FinalSubmitted", "Query Raised", "Cancelled"].map(s => ({ value: s, label: s }))}
-                    selectedValues={statusFilter}
-                    onChange={setStatusFilter}
-                    placeholder="Status: All"
-                  />
-                  {hasFilters && (
-                    <button onClick={clearFilters} style={{
-                      fontSize: 12, color: "#dc2626", background: "#fef2f2",
-                      border: "1px solid #fecaca", borderRadius: 8, padding: "8px 14px",
-                      cursor: "pointer", fontWeight: 600, transition: "all 0.2s"
-                    }}>
-                      Clear Filters
-                    </button>
-                  )}
+                  <FilterBar {...filterBarProps} />
                 </div>
-
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
                         {["Invoice No", "Bank Name", "Bill Month", "Date", "Amount", "Status", "Action"].map(h => (
-                          <th key={h} style={{
-                            padding: "14px 20px", textAlign: "left", fontSize: 11,
-                            fontWeight: 600, color: "#64748b", textTransform: "uppercase",
-                            letterSpacing: "0.5px", borderBottom: "2px solid #e2e8f0"
-                          }}>{h}</th>
+                          <th key={h} style={{ padding: "14px 20px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", borderBottom: "2px solid #e2e8f0" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {loadingInvoices ? (
                         <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>Loading saved data...</td></tr>
-                      ) : savedInvoices.length === 0 ? (
-                        <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>No saved invoices in database.</td></tr>
-                      ) : savedInvoices.map((inv, idx) => (
-                        <tr key={inv._id} style={{
-                          borderBottom: "1px solid #f1f5f9",
-                          transition: "background 0.15s"
-                        }}
+                      ) : filteredSavedInvoices.length === 0 ? (
+                        <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>No saved invoices found.</td></tr>
+                      ) : filteredSavedInvoices.map((inv) => (
+                        <tr key={inv._id} style={{ borderBottom: "1px solid #f1f5f9" }}
                           onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
                           onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                           <td style={{ padding: "14px 20px", fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{inv.invoiceNo}</td>
@@ -4868,30 +4250,12 @@ export default function App() {
                           <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569" }}>{formatDate(inv.invoiceDate)}</td>
                           <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>₹{inv.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                           <td style={{ padding: "14px 20px" }}>
-                            <span style={{
-                              padding: "6px 12px",
-                              borderRadius: 8,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              letterSpacing: "0.3px",
-                              background: inv.status === "Paid" ? "#d1fae5" : (inv.status === "Cancelled" ? "#fee2e2" : "#fef3c7"),
-                              color: inv.status === "Paid" ? "#065f46" : (inv.status === "Cancelled" ? "#991b1b" : "#92400e")
-                            }}>
+                            <span style={{ padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: inv.status === "Paid" ? "#d1fae5" : (inv.status === "Cancelled" ? "#fee2e2" : "#fef3c7"), color: inv.status === "Paid" ? "#065f46" : (inv.status === "Cancelled" ? "#991b1b" : "#92400e") }}>
                               {inv.status || "Submitted"}
                             </span>
                           </td>
                           <td style={{ padding: "14px 20px" }}>
-                            <button
-                              onClick={() => setInvoiceModal({ existingInvoice: inv })}
-                              style={{
-                                background: "#eff6ff", color: "#1d4ed8",
-                                border: "1px solid #bfdbfe", borderRadius: 8,
-                                padding: "8px 16px", fontSize: 12, fontWeight: 600,
-                                cursor: "pointer", transition: "all 0.2s"
-                              }}
-                              onMouseEnter={e => { e.target.style.background = "#dbeafe"; }}
-                              onMouseLeave={e => { e.target.style.background = "#eff6ff"; }}
-                            >
+                            <button onClick={() => setInvoiceModal({ existingInvoice: inv })} style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                               View & Print
                             </button>
                           </td>
@@ -4904,217 +4268,76 @@ export default function App() {
             </>
           )}
 
-          {/* INVOICE TAB */}
+          {/* ── INVOICE TAB ── */}
           {activeTab === "Invoice" && (
-            <div style={{
-              background: "#fff", borderRadius: "16px",
-              border: "1px solid #f1f5f9", overflow: "hidden",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-            }}>
+            <div style={{ background: "#fff", borderRadius: "16px", border: "1px solid #f1f5f9", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
               <div style={{ padding: "20px 28px", borderBottom: "1px solid #f1f5f9" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
                   <div>
-                    <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.3px" }}>All cases</p>
+                    <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.3px" }}>All Cases</p>
                     <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
                       {loading ? "Loading…" : `${filtered.length} of ${cases.length} cases`}
                     </p>
                   </div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    {canBulkInvoice && !loading && (
-                      <button
-                        onClick={() => setInvoiceModal({ cases: filtered, isBulk: true })}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 8,
-                          fontSize: 13, color: "#fff",
-                          background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-                          border: "none", borderRadius: 10, padding: "10px 20px",
-                          cursor: "pointer", fontWeight: 600,
-                          boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
-                          transition: "all 0.2s"
-                        }}
-                        onMouseEnter={e => e.target.style.transform = "translateY(-1px)"}
-                        onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                      >
-                        <Icon type="bulkInvoice" size={16} /> Create Invoice ({filtered.length})
-                      </button>
-                    )}
-                    {hasFilters && (
-                      <button onClick={clearFilters} style={{
-                        fontSize: 13, color: "#dc2626", background: "#fef2f2",
-                        border: "1px solid #fecaca", borderRadius: 10, padding: "10px 18px",
-                        cursor: "pointer", fontWeight: 600
-                      }}>
-                        Clear filters
-                      </button>
-                    )}
-                  </div>
+                  {canBulkInvoice && !loading && (
+                    <button
+                      onClick={() => setInvoiceModal({ cases: filtered, isBulk: true })}
+                      style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#fff", background: "linear-gradient(135deg, #3b82f6, #2563eb)", border: "none", borderRadius: 10, padding: "10px 20px", cursor: "pointer", fontWeight: 600, boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
+                      <Icon type="bulkInvoice" size={16} /> Create Invoice ({filtered.length})
+                    </button>
+                  )}
                 </div>
 
-                {/* Invoice Page Filters */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 18, alignItems: "center" }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    background: "#f8fafc", border: "1px solid #e2e8f0",
-                    borderRadius: 10, padding: "10px 16px", minWidth: 220, flex: "1 1 220px",
-                    transition: "all 0.2s"
-                  }}>
-                    <Icon type="search" size={16} />
-                    <input
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      placeholder="Search customer name…"
-                      style={{
-                        background: "none", border: "none", outline: "none",
-                        fontSize: 13, color: "#0f172a", width: "100%",
-                        fontFamily: "inherit"
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Icon type="filter" size={16} />
-                    <MultiSelect
-                      options={banks.filter(b => b !== "All").map(b => ({ value: b, label: b }))}
-                      selectedValues={bankFilter}
-                      onChange={setBankFilter}
-                      placeholder="Bank: All"
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Icon type="calendar" size={16} />
-                    <MultiSelect
-                      options={["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, idx) => ({ value: idx, label: m }))}
-                      selectedValues={monthFilter}
-                      onChange={setMonthFilter}
-                      placeholder="Month: All"
-                    />
-                  </div>
-
-                  <MultiSelect
-                    options={Array.from({ length: 5 }, (_, i) => 2024 + i).map(y => ({ value: y, label: String(y) }))}
-                    selectedValues={yearFilter}
-                    onChange={setYearFilter}
-                    placeholder="Year: All"
-                  />
-
-                  <MultiSelect
-                    options={["Pending", "Work in Progress", "FinalSubmitted", "Query Raised", "Cancelled"].map(s => ({ value: s, label: s }))}
-                    selectedValues={statusFilter}
-                    onChange={setStatusFilter}
-                    placeholder="Status: All"
-                  />
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Visit date:</span>
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={e => { setFromDate(e.target.value); setPage(1); }}
-                      style={{
-                        fontSize: 12, borderRadius: 8, padding: "9px 12px",
-                        border: "1px solid #e2e8f0", background: "#fff",
-                        color: "#0f172a", cursor: "pointer", fontFamily: "inherit"
-                      }}
-                    />
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>to</span>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={e => { setToDate(e.target.value); setPage(1); }}
-                      style={{
-                        fontSize: 12, borderRadius: 8, padding: "9px 12px",
-                        border: "1px solid #e2e8f0", background: "#fff",
-                        color: "#0f172a", cursor: "pointer", fontFamily: "inherit"
-                      }}
-                    />
-                  </div>
-                </div>
+                {/* ── INVOICE TAB FILTERS (same FilterBar component) ── */}
+                <FilterBar {...filterBarProps} />
               </div>
 
               <div style={{ overflowX: "auto" }}>
                 {loading ? (
-                  <div style={{ padding: 60, textAlign: "center", color: "#94a3b8", fontSize: 15 }}>
-                    <div style={{ animation: "pulse 1.5s ease-in-out infinite" }}>Loading cases from API…</div>
-                  </div>
+                  <div style={{ padding: 60, textAlign: "center", color: "#94a3b8", fontSize: 15 }}>Loading cases from API…</div>
                 ) : error ? (
                   <div style={{ padding: 60, textAlign: "center" }}>
                     <p style={{ color: "#dc2626", fontSize: 14, margin: 0, fontWeight: 500 }}>{error}</p>
-                    <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 8 }}>Make sure your local server is running at localhost:5000</p>
                   </div>
                 ) : (
-                  <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
+                  <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
-                        {["#", "Bank name", "Customer name", "Ref no.", "Address", "Created Date", "Date of visit", "Status", "Invoice"].map(h => (
-                          <th key={h} style={{
-                            padding: "14px 20px", textAlign: "left", fontSize: 11,
-                            fontWeight: 600, color: "#64748b", textTransform: "uppercase",
-                            letterSpacing: "0.5px", whiteSpace: "nowrap",
-                            borderBottom: "2px solid #e2e8f0"
-                          }}>{h}</th>
+                        {["#", "Bank name", "Customer name", "Ref no.", "Address", "City", "Created Date", "Date of visit", "Status", "Invoice"].map(h => (
+                          <th key={h} style={{ padding: "14px 20px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap", borderBottom: "2px solid #e2e8f0" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {paginated.length === 0 ? (
-                        <tr><td colSpan={9} style={{ padding: 50, textAlign: "center", fontSize: 14, color: "#94a3b8" }}>No cases match the current filters.</td></tr>
-                      ) : paginated.map((c, i) => (
-                        <tr key={c._id} style={{
-                          borderBottom: "1px solid #f1f5f9",
-                          transition: "background 0.15s"
-                        }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <td style={{ padding: "14px 20px", fontSize: 13, color: "#94a3b8" }}>{(page - 1) * PAGE_SIZE + i + 1}</td>
-                          <td style={{ padding: "14px 20px", whiteSpace: "nowrap" }}>
-                            <span style={{
-                              fontSize: 12, fontWeight: 600,
-                              background: "#eff6ff", color: "#1d4ed8",
-                              border: "1px solid #bfdbfe", borderRadius: 8,
-                              padding: "5px 12px"
-                            }}>{c.bankName}</span>
-                          </td>
-                          <td style={{ padding: "14px 20px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                              <div style={{
-                                width: 36, height: 36, borderRadius: "50%",
-                                background: "#f1f5f9", display: "flex",
-                                alignItems: "center", justifyContent: "center",
-                                fontSize: 12, fontWeight: 600, color: "#64748b", flexShrink: 0
-                              }}>
-                                {c.customerName !== "—" ? c.customerName.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase() : "—"}
-                              </div>
+                        <tr><td colSpan={10} style={{ padding: 50, textAlign: "center", fontSize: 14, color: "#94a3b8" }}>No cases match the current filters.</td></tr>
+                      ) : paginated.map((c, i) => {
+                        const rowColor = getRowColor(c.status, c.createdDateRaw);
+                        return (
+                          <tr key={c._id} className={rowColor.className} style={{ backgroundColor: rowColor.backgroundColor, borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}>
+                            <td style={{ padding: "14px 20px", fontSize: 13, color: "#94a3b8" }}>{(page - 1) * PAGE_SIZE + i + 1}</td>
+                            <td style={{ padding: "14px 20px", whiteSpace: "nowrap" }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 12px" }}>{c.bankName}</span>
+                            </td>
+                            <td style={{ padding: "14px 20px" }}>
                               <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "#0f172a", whiteSpace: "nowrap" }}>{c.customerName}</p>
-                            </div>
-                          </td>
-                          <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.refNo}</td>
-                          <td style={{ padding: "14px 20px", maxWidth: 260 }}>
-                            <p style={{ margin: 0, fontSize: 13, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.address}>{c.address}</p>
-                          </td>
-                          <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.createdDateFormatted}</td>
-                          <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.dateOfVisitFormatted}</td>
-                          <td style={{ padding: "14px 20px" }}><StatusBadge status={c.status} /></td>
-                          <td style={{ padding: "14px 20px" }}>
-                            <button
-                              onClick={() => setInvoiceModal({ cases: [c], isBulk: false })}
-                              title="Open Invoice"
-                              style={{
-                                display: "flex", alignItems: "center", gap: 6,
-                                background: "#eff6ff", color: "#1d4ed8",
-                                border: "1px solid #bfdbfe", borderRadius: 8,
-                                padding: "7px 14px", cursor: "pointer", fontSize: 12,
-                                fontWeight: 600, whiteSpace: "nowrap",
-                                transition: "all 0.2s"
-                              }}
-                              onMouseEnter={e => { e.target.style.background = "#dbeafe"; }}
-                              onMouseLeave={e => { e.target.style.background = "#eff6ff"; }}
-                            >
-                              <Icon type="invoice" size={14} /> Invoice
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.refNo}</td>
+                            <td style={{ padding: "14px 20px", maxWidth: 260 }}>
+                              <p style={{ margin: 0, fontSize: 13, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.address}>{c.address}</p>
+                            </td>
+                            <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.city || "N/A"}</td>
+                            <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.createdDateFormatted}</td>
+                            <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{c.dateOfVisitFormatted}</td>
+                            <td style={{ padding: "14px 20px" }}><StatusBadge status={c.status} /></td>
+                            <td style={{ padding: "14px 20px" }}>
+                              <button onClick={() => setInvoiceModal({ cases: [c], isBulk: false })} style={{ display: "flex", alignItems: "center", gap: 6, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+                                <Icon type="invoice" size={14} /> Invoice
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -5122,60 +4345,29 @@ export default function App() {
 
               {/* PAGINATION */}
               {!loading && !error && (
-                <div style={{
-                  padding: "16px 28px", borderTop: "1px solid #f1f5f9",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  flexWrap: "wrap", gap: 12
-                }}>
+                <div style={{ padding: "16px 28px", borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                   <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>
                     Page <strong style={{ color: "#0f172a" }}>{page}</strong> of <strong style={{ color: "#0f172a" }}>{totalPages}</strong>{" · "}{filtered.length} result{filtered.length !== 1 ? "s" : ""}
                   </p>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      style={{
-                        width: 36, height: 36, border: "1px solid #e2e8f0",
-                        borderRadius: 10, background: "#fff",
-                        cursor: page === 1 ? "default" : "pointer",
-                        opacity: page === 1 ? 0.4 : 1,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        color: "#475569", transition: "all 0.2s"
-                      }}
-                    ><Icon type="chevL" size={16} /></button>
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                      style={{ width: 36, height: 36, border: "1px solid #e2e8f0", borderRadius: 10, background: "#fff", cursor: page === 1 ? "default" : "pointer", opacity: page === 1 ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}>
+                      <Icon type="chevL" size={16} />
+                    </button>
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       let p = i + 1;
                       if (totalPages > 5) { const start = Math.max(1, Math.min(page - 2, totalPages - 4)); p = start + i; }
                       return (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          style={{
-                            width: 36, height: 36,
-                            border: p === page ? "none" : "1px solid #e2e8f0",
-                            borderRadius: 10,
-                            background: p === page ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "#fff",
-                            color: p === page ? "#fff" : "#475569",
-                            cursor: "pointer", fontSize: 13,
-                            fontWeight: p === page ? 600 : 500,
-                            transition: "all 0.2s",
-                            boxShadow: p === page ? "0 2px 8px rgba(37,99,235,0.3)" : "none"
-                          }}
-                        >{p}</button>
+                        <button key={p} onClick={() => setPage(p)}
+                          style={{ width: 36, height: 36, border: p === page ? "none" : "1px solid #e2e8f0", borderRadius: 10, background: p === page ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "#fff", color: p === page ? "#fff" : "#475569", cursor: "pointer", fontSize: 13, fontWeight: p === page ? 600 : 500, boxShadow: p === page ? "0 2px 8px rgba(37,99,235,0.3)" : "none" }}>
+                          {p}
+                        </button>
                       );
                     })}
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      style={{
-                        width: 36, height: 36, border: "1px solid #e2e8f0",
-                        borderRadius: 10, background: "#fff",
-                        cursor: page === totalPages ? "default" : "pointer",
-                        opacity: page === totalPages ? 0.4 : 1,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        color: "#475569", transition: "all 0.2s"
-                      }}
-                    ><Icon type="chevR" size={16} /></button>
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                      style={{ width: 36, height: 36, border: "1px solid #e2e8f0", borderRadius: 10, background: "#fff", cursor: page === totalPages ? "default" : "pointer", opacity: page === totalPages ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}>
+                      <Icon type="chevR" size={16} />
+                    </button>
                   </div>
                 </div>
               )}

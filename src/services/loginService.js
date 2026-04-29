@@ -128,7 +128,9 @@
 
 // services/loginService.js
 // const URL = "http://localhost:5000"
-const URL = "https://banker-backend-8ttk.onrender.com"
+const URL = import.meta.env.BACKEND_URL
+
+// const URL = "https://banker-backend-8ttk.onrender.com"
 
 const API_BASE_URL = `${URL}/api/auth`;
 
